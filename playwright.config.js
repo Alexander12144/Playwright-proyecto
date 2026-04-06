@@ -20,7 +20,7 @@ module.exports = defineConfig({
   ],
 
   use: {
-    headless: false, // Mantener en false para debuggear visualmente
+    headless: process.env.CI ? true : false, // Mantener en false para debuggear visualmente
 
     ignoreHTTPSErrors: true, // Salta el error de certificado de azrbttlwsdev01
 
