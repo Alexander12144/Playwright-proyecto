@@ -1,4 +1,4 @@
-const { NavigationMenu } = require('../components/NavigationMenu');
+const { NavigationMenu } = require('./menu/NavigationMenu');
 const { BasePage } = require('./BasePage');
 
 class HomePage extends BasePage {
@@ -18,35 +18,18 @@ class HomePage extends BasePage {
         this.btnImprimir = page.getByRole('listitem').filter({ hasText: 'Imprimir' });
         this.logo = page.locator('#logo');
 
-        // Elementos en el Primer Iframe (id="1")
+        // Titulo de frame
         this.linkActividadUsuario = this.frame1.getByRole('link', { name: 'Actividad del usuario' });
 
-        // Elementos en el Segundo Iframe (Anidado)
+        // Elementos en el Iframe (Anidado)
         this.txtUltimaActividad = this.frameInterno.getByText('Última actividad registrada');
         this.cellUsuario = this.frameInterno.getByRole('cell', { name: 'Usuario', exact: true });
         this.cellEmpresa = this.frameInterno.getByRole('cell', { name: 'Empresa', exact: true });
         this.cellSucursal = this.frameInterno.getByRole('cell', { name: 'Sucursal', exact: true });
         this.cellFechaSistema = this.frameInterno.getByRole('cell', { name: 'Fecha del Sistema', exact: true });
 
-        // Menu de navegacion
+        // Menu de navegación (ahora usa frames correctos)
         this.menu = new NavigationMenu(page);
-    }
-
-    async validateFullUI() {
-        await this.expectVisible(this.logo);
-        await this.expectVisible(this.btnInicio);
-        await this.expectVisible(this.btnAccesos);
-
-        await this.expectVisible(this.btnAtras);
-        await this.expectVisible(this.btnRecargar);
-
-        await this.expectVisible(this.linkActividadUsuario, 15000);
-        await this.expectVisible(this.txtUltimaActividad);
-
-        await this.expectVisible(this.cellUsuario);
-        await this.expectVisible(this.cellEmpresa);
-        await this.expectVisible(this.cellSucursal);
-        await this.expectVisible(this.cellFechaSistema);
     }
 }
 
