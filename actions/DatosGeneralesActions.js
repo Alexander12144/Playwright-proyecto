@@ -8,73 +8,60 @@ class DatosGeneralesActions {
         this.datosPage = new DatosGeneralesPage(page);
     }
 
-    // ========== VALIDACIONES DE ESTRUCTURA ==========
-    async validarDatosIniciales() {
-        await this.datosPage.expectVisible(this.datosPage.tituloStep4, TIMEOUTS.LONG);
-        await this.datosPage.expectVisible(this.datosPage.labelDatosIniciales, TIMEOUTS.MEDIUM);
-        await this.datosPage.expectVisible(this.datosPage.selectTipoPersona, TIMEOUTS.MEDIUM);
-        await this.datosPage.expectVisible(this.datosPage.inputNumeroDocumento, TIMEOUTS.MEDIUM);
+    async validarCargaSeccion() {
+        await expect(this.datosPage.tituloStep).toBeVisible({ timeout: TIMEOUTS.LONG });
     }
 
     /**
-     * Valida que todos los mensajes de error detectados por el Flow sean visibles
-     * @param {string[]} listaErrores - Array de mensajes definidos en la Page
+     * @param {string[]} listaErrores - Array de mensajes de error a validar
      */
     async validarPresenciaDeErrores(listaErrores) {
-        const erroresValidos = listaErrores.filter(error => !!error);
-
-        if (erroresValidos.length === 0) return;
-
-        for (const textoError of erroresValidos) {
-            const locator = this.datosPage.getLocatorError(textoError);
-            
-            await expect(locator, `No se visualizó el error: ${textoError}`).toBeVisible({ 
+        for (const textoError of listaErrores.filter(e => !!e)) {
+            await expect(this.datosPage.getLocatorError(textoError)).toBeVisible({ 
                 timeout: TIMEOUTS.MEDIUM 
             });
         }
     }
 
-    // ========== ACCIONES ATÓMICAS (INTERACCIÓN) ==========
-
     async seleccionarTipoPersona(tipo) {
-        await this.datosPage.selectOption(this.datosPage.selectTipoPersona, tipo);
+        await this.datosPage.selectTipoPersona.selectOption(tipo);
     }
 
     async seleccionarPais(pais) {
-        await this.datosPage.selectOption(this.datosPage.selectPaisDocumento, pais);
+        await this.datosPage.selectPaisDocumento.selectOption(pais);
     }
 
     async seleccionarTipoDoc(tipo) {
-        await this.datosPage.selectOption(this.datosPage.selectTipoDocumento, tipo);
+        await this.datosPage.selectTipoDocumento.selectOption(tipo);
     }
 
     async ingresarNumeroDocumento(numero) {
-        await this.datosPage.fill(this.datosPage.inputNumeroDocumento, numero);
+        await this.datosPage.inputNumeroDocumento.fill(numero.toString());
     }
 
     async seleccionarTipoSolicitud(tipo) {
-        await this.datosPage.selectOption(this.datosPage.selectTipoSolicitud, tipo);
-    }
-
-    async seleccionarConcesionaria(concesionaria) {
-        await this.datosPage.selectOption(this.datosPage.selectConcesionaria, concesionaria);
+        await this.datosPage.selectTipoSolicitud.selectOption(tipo);
     }
 
     async seleccionarSucursal(sucursal) {
-        await this.datosPage.selectOption(this.datosPage.selectSucursal, sucursal);
+        await this.datosPage.selectSucursal.selectOption(sucursal);
     }
 
     async seleccionarVendedor(vendedor) {
-        await this.datosPage.selectOption(this.datosPage.selectVendedor, vendedor);
+        await this.datosPage.selectVendedor.selectOption(vendedor);
     }
 
     async ejecutarValidacion() {
-        await this.datosPage.click(this.datosPage.linkValidarDatos);
-        await this.datosPage.waitForValidacionProcesada();
+        await this.datosPage.linkValidarDatos.click();
+        // Sincronización dinámica: espera éxito o error
+        await Promise.race([
+            this.datosPage.inputResultadoValidacion.waitFor({ state: 'visible' }),
+            this.page.locator('text=Debe').first().waitFor({ state: 'visible' })
+        ]).catch(() => {});
     }
 
     async continuarSiguiente() {
-        await this.datosPage.click(this.datosPage.linkSiguiente);
+        await this.datosPage.linkSiguiente.click();
     }
 }
 

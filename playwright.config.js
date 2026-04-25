@@ -16,7 +16,8 @@ module.exports = defineConfig({
     ['list'],
     ['html', {
       open: 'never'
-    }]
+    }],
+    ['allure-playwright']
   ],
 
   use: {

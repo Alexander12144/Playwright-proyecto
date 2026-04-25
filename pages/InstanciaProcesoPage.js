@@ -1,36 +1,30 @@
 const { BasePage } = require('./BasePage');
 
-/**
- * InstanciaProcesoPage - Page Object
- * ⚠️ RESPONSABILIDAD: SOLO selectores y localizadores
- * Toda la lógica va en InstanciaProcesoActions.js
- */
 class IniciarProcesoPage extends BasePage {
     constructor(page) {
         super(page);
-
-        // Frames
-        this.framePadre = page.frameLocator('iframe[id="1"]');
-        this.frameContenido = this.framePadre.frameLocator('iframe[name="process1_step2"]');
-
-        // --- SELECTORES ---
-        this.titulo = this.frameContenido.getByText('Iniciar Instancia de Proceso');
-
-        // Campos de Texto
-        this.inputAsunto = this.frameContenido.locator('#vASUNTO');
-        this.inputComentario = this.frameContenido.locator('#vCOMENTARIO');
-
-        // Botones de Acción
-        this.btnIniciar = this.frameContenido.getByRole('link', { name: 'Iniciar' });
-        this.btnCancelar = this.frameContenido.getByRole('link', { name: 'Cancelar' });
+        
+        // Centralización del frame de contenido
+        this.baseFrame = page.frameLocator('iframe[id="1"]').frameLocator('iframe[name="process1_step2"]');
     }
 
-    // ========== LOCALIZADORES DINÁMICOS ==========
+    // --- Títulos y Etiquetas ---
+    get titulo() { return this.baseFrame.getByText('Iniciar Instancia de Proceso'); }
+
+    // --- Campos de Entrada ---
+    get inputAsunto() { return this.baseFrame.locator('#vASUNTO'); }
+    get inputComentario() { return this.baseFrame.locator('#vCOMENTARIO'); }
+
+    // --- Botones de Acción ---
+    get btnIniciar() { return this.baseFrame.getByRole('link', { name: 'Iniciar' }); }
+    get btnCancelar() { return this.baseFrame.getByRole('link', { name: 'Cancelar' }); }
+
+    // --- Localizadores Dinámicos ---
     /**
-     * Obtener locator para un flujo específico
+     * @param {string} nombreFlujo - Nombre exacto del flujo a seleccionar
      */
     getFlujoLocator(nombreFlujo) {
-        return this.frameContenido.getByText(nombreFlujo, { exact: true });
+        return this.baseFrame.getByText(nombreFlujo, { exact: true });
     }
 }
 

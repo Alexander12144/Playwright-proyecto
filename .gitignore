@@ -1,8 +1,45 @@
-
-# Playwright
+# --- Dependencias de Node ---
 node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# --- Reportes y Resultados de Playwright ---
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
 /test-results/
-/playwright-report/
-/blob-report/
-/playwright/.cache/
-/playwright/.auth/
+
+# --- Persistencia de Sesión de Playwright ---
+# (Útil si usas storageState localmente)
+playwright/.auth/
+.auth/
+
+# --- Variables de Entorno (CRÍTICO) ---
+# Esto evita que tus contraseñas terminen en el repo
+.env
+credenciales.env
+*.env
+
+# --- Basura detectada en tu estructura ---
+# Borra esto del repo si ya lo subiste por accidente
+%USERPROFILE%/
+target/
+
+# --- IDEs y Editores ---
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# --- Sistema Operativo ---
+.DS_Store
+Thumbs.db
+
+# --- Reportes de Allure ---
+allure-results/
+allure-report/

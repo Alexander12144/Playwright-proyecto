@@ -2,45 +2,29 @@ const { AuthActions } = require('../actions/AuthActions');
 
 class AuthFlows {
     constructor(page) {
-        this.auth = new AuthActions(page);
+        this.page = page;
+        this.actions = new AuthActions(page);
     }
 
     /**
-     * Flujo: login exitoso
+     * @returns {Promise<Page>} - Retorna la nueva ventana/página autenticada.
      */
     async loginSuccess(username, password) {
-        await this.auth.navigateToLogin();
-        await this.auth.fillCredentials(username, password);
-        
-        return await this.auth.clickAndWaitNewPage(() =>
-            this.auth.clickLoginButton()
-        );
+        return await this.actions.loginSuccess(username, password);
     }
 
     /**
-     * Flujo: login fallido (credenciales incorrectas)
+     * Procesa un intento de login esperando un mensaje de error.
      */
-    async loginFail(username, password) {
-        await this.auth.navigateToLogin();
-        await this.auth.fillCredentials(username, password);
-        await this.auth.clickLoginButton();
+    async loginConError(username, password) {
+        await this.actions.loginErrorAndValidate(username, password);
     }
 
     /**
-     * Flujo: login sin datos
+     * Intento de login con campos vacíos.
      */
-    async loginWithoutCredentials() {
-        await this.auth.navigateToLogin();
-        await this.auth.clickLoginButton();
-    }
-
-    /**
-     * Flujo: login con datos inválidos
-     */
-    async loginWithInvalidData(username, password) {
-        await this.auth.navigateToLogin();
-        await this.auth.fillCredentials(username, password);
-        await this.auth.clickLoginButton();
+    async loginSinCredenciales() {
+        await this.actions.loginErrorAndValidate('', '');
     }
 }
 

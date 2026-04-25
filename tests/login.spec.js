@@ -1,8 +1,7 @@
-const { test, expect } = require('@playwright/test');
+const { test } = require('@playwright/test');
 const { AuthFlows } = require('../flows/AuthFlows');
-const { AuthActions } = require('../actions/AuthActions');
 
-test.describe('Login - Bantotal', () => {
+test.describe('Módulo de Autenticación - Bantotal', () => {
 
     test('Debe loguearse correctamente con credenciales válidas', async ({ page }) => {
         const authFlow = new AuthFlows(page);
@@ -13,34 +12,34 @@ test.describe('Login - Bantotal', () => {
         );
     });
 
-    test('Debe rechazar usuario inválido', async ({ page }) => {
-        const authActions = new AuthActions(page);
+    test('Debe rechazar el acceso con usuario inválido', async ({ page }) => {
+        const authFlow = new AuthFlows(page);
 
-        await authActions.loginErrorAndValidate(
+        await authFlow.loginConError(
             'usuario_invalido',
             process.env.PASSWORD
         );
     });
 
-    test('Debe rechazar password inválido', async ({ page }) => {
-        const authActions = new AuthActions(page);
+    test('Debe rechazar el acceso con password inválido', async ({ page }) => {
+        const authFlow = new AuthFlows(page);
 
-        await authActions.loginErrorAndValidate(
+        await authFlow.loginConError(
             process.env.USER,
             'password_invalido'
         );
     });
 
-    test('Debe rechazar credenciales vacías', async ({ page }) => {
-        const authActions = new AuthActions(page);
+    test('Debe validar la obligatoriedad de las credenciales (campos vacíos)', async ({ page }) => {
+        const authFlow = new AuthFlows(page);
 
-        await authActions.loginErrorAndValidateNull('', '');
+        await authFlow.loginSinCredenciales();
     });
 
-    test('Debe rechazar username o password vacío', async ({ page }) => {
-        const authActions = new AuthActions(page);
+    test('Debe rechazar el acceso cuando falta el password', async ({ page }) => {
+        const authFlow = new AuthFlows(page);
 
-        await authActions.loginErrorAndValidateNull(
+        await authFlow.loginConError(
             process.env.USER,
             ''
         );

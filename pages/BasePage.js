@@ -1,154 +1,77 @@
 const { expect } = require('@playwright/test');
 
-/**
- * BasePage - Clase base para todos los Page Objects
- */
 class BasePage {
     constructor(page) {
         this.page = page;
     }
 
-    // ========== NAVEGACIÓN ==========
-    async goto(path, options = {}) {
-        await this.page.goto(path, options);
-        await this.waitForPageReady();
+    /**
+     * Espera a que el loader de Bantotal aparezca y desaparezca.
+     * Se define dinámicamente para evitar errores de referencia en frames refrescados.
+     */
+    async waitForProcessing(timeout = 25000) {
+        // Localizador dinámico: busca el loader sin importar el nivel de profundidad
+        const loader = this.page.locator('iframe[id="1"]')
+            .contentFrame()
+            .getByText('Procesando, por favor espere');
+
+        try {
+            // Damos un margen pequeño para que el loader aparezca
+            await loader.waitFor({ state: 'visible', timeout: 2000 });
+            // Esperamos a que el sistema termine de procesar
+            await loader.waitFor({ state: 'hidden', timeout });
+        } catch (e) {
+            // Si el loader no aparece en 2s, asumimos que el sistema ya procesó
+        }
     }
 
-    // ========== ACCIONES ATÓMICAS BÁSICAS ==========
+    // ========== NAVEGACIÓN Y ESTADO ==========
+
+    async goto(path, options = {}) {
+        await this.page.goto(path, options);
+        await this.page.waitForLoadState('load');
+    }
+
+    async waitForPageReady(timeout = 15000) {
+        await this.page.waitForLoadState('domcontentloaded', { timeout });
+        await this.page.waitForLoadState('networkidle', { timeout });
+    }
+
+    // ========== INTERACCIONES RESILIENTES ==========
+
     /**
-     * Click simple en un elemento
+     * Selección de opciones con reintento automático y manejo de loader.
+     */
+    async selectOption(locator, value) {
+        try {
+            await locator.waitFor({ state: 'visible', timeout: 5000 });
+            await locator.selectOption(value);
+        } catch (error) {
+            // Reintento tras breve pausa si el frame se "pasmó"
+            await this.page.waitForTimeout(1000);
+            await locator.selectOption(value);
+        }
+        await this.waitForProcessing();
+    }
+
+    /**
+     * Click estándar con espera de procesamiento posterior.
      */
     async click(locator) {
         await locator.click();
+        await this.waitForProcessing();
     }
 
-    /**
-     * Llenar input con texto
-     */
-    async fill(locator, value) {
-        await locator.fill(value);
-    }
+    // ========== UTILITARIOS DE DATOS ==========
 
-    /**
-     * Escribir lentamente (letra por letra)
-     */
-    async type(locator, value) {
-        await locator.type(value, { delay: 50 });
-    }
-
-    /**
-     * Seleccionar opción en dropdown
-     */
-    async selectOption(locator, value) {
-        await locator.selectOption(value);
-    }
-
-    /**
-     * Click con force (ignora oculto)
-     */
-    async forceClick(locator) {
-        await locator.click({ force: true });
-    }
-
-    /**
-     * Presionar tecla
-     */
-    async press(locator, key) {
-        await locator.press(key);
-    }
-
-    // ========== ESPERAS Y SINCRONIZACIÓN ==========
-    /**
-     * Esperar a que la página esté lista
-     */
-    async waitForPageReady(timeout = 15000) {
-        await this.page.waitForLoadState('load', { timeout });
-    }
-
-    /**
-     * Esperar a un elemento visible
-     * ⚠️ USE ONLY FOR BASIC CHECKS
-     */
-    async waitForVisible(locator, timeout = 15000) {
-        await locator.waitFor({ state: 'visible', timeout });
-    }
-
-    /**
-     * Esperar a un elemento oculto
-     */
-    async waitForHidden(locator, timeout = 10000) {
-        await locator.waitFor({ state: 'hidden', timeout });
-    }
-
-    /**
-     * Esperar tiempo específico (úsalo con moderación)
-     */
-    async delay(ms) {
-        await this.page.waitForTimeout(ms);
-    }
-
-    // ========== OBTENER DATOS ==========
-    /**
-     * Obtener texto visible
-     */
-    async getText(locator) {
-        return await locator.textContent();
-    }
-
-    /**
-     * Obtener atributo HTML
-     */
-    async getAttribute(locator, attribute) {
-        return await locator.getAttribute(attribute);
-    }
-
-    /**
-     * Obtener valor de input
-     */
     async getInputValue(locator) {
+        await locator.waitFor({ state: 'visible' });
         return await locator.inputValue();
     }
 
-    /**
-     * Contar elementos
-     */
-    async getCount(locator) {
-        return await locator.count();
-    }
-
-    // ========== FRAMES ==========
-    frameLocator(selector) {
-        return this.page.frameLocator(selector);
-    }
-
-    // ========== VALIDACIONES BÁSICAS (usar con moderación) ==========
-    /**
-     * Validar que es visible - USAR SOLO PARA VERIFICACIONES CRÍTICAS
-     * Las validaciones deben ir en Actions o Tests
-     */
-    async expectVisible(locator, timeout = 20000) {
-        await expect(locator).toBeVisible({ timeout });
-    }
-
-    /**
-     * Validar que es invisible
-     */
-    async expectHidden(locator, timeout = 10000) {
-        await expect(locator).toBeHidden({ timeout });
-    }
-
-    /**
-     * Validar cantidad de elementos
-     */
-    async expectCount(locator, count) {
-        await expect(locator).toHaveCount(count);
-    }
-
-    /**
-     * Validar que tiene texto
-     */
-    async expectText(locator, text) {
-        await expect(locator).toContainText(text);
+    async getText(locator) {
+        await locator.waitFor({ state: 'visible' });
+        return (await locator.textContent()).trim();
     }
 }
 

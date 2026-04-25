@@ -11,12 +11,8 @@ class BandejaTareasFlow {
     }
 
     /**
-     * Flujo completo:
-     * 1. Validar carga
-     * 2. Filtrar (opcional)
-     * 3. Seleccionar
-     * 4. Ejecutar
-     * 5. Iniciar proceso
+     * @param {string|number} instancia - ID de la tarea
+     * @param {Object} filtros - Criterios de búsqueda opcionales
      */
     async ejecutarInstancia(instancia, filtros = {}) {
         await this.actions.validarCargaCompleta();
@@ -28,44 +24,29 @@ class BandejaTareasFlow {
         await this.actions.seleccionarFila(instancia);
         await this.actions.ejecutarAccion();
     }
+
     /**
-     * Crear instancia de proceso desde la bandeja de tareas:
-     * 1. Ingresar inicio de proceso
-     * 2. Seleccionar proceso
-     * 3. Ingresar datos
+     * Orquesta la creación desde cero de una solicitud vehicular.
      */
-    async crearInstanciaProceso() {
+    async crearInstanciaProcesoVehicular(dataCliente = {}) {
         await this.actions.ingresarInicioProceso();
+        
         await this.instanciaProcesoFlow.seleccionarFlujoEIniciar('Flujo Vehicular / StartSolicitud');
-        await this.datosGeneralesFlow.completarSeccionDatosGenerales(
-            {
-                tipoPersona: 'Natural',
-                pais: 'Perú',
-                tipoDoc: 'DNI',
-                numDoc: '12345678',
-                tipoSolicitud: 'Vehicular',
-                concesionaria: 'AUTOESPAR',
-                sucursal: 'AU-SAN MIGUEL',
-                vendedor: 'Juan Pérez'
-            }, { validarExito: true });
+        
+        // El flow de datos generales ya tiene sus propias validaciones internas
+        await this.datosGeneralesFlow.completarSeccionDatosGenerales(dataCliente, { validarExito: true });
     }
 
-    async continuarInstanciaEjecutar(datosManuales = {}) {
-        await this.actions.filtrarInstancias(datosManuales);
-        await this.actions.validarFilaVisible(datosManuales.nroInstancia);  
-        await this.actions.seleccionarFila(datosManuales.nroInstancia);
+    /**
+     * Retoma una instancia existente en la bandeja y completa sus datos.
+     */
+    async continuarInstanciaExistente(datosInstancia = {}) {
+        await this.actions.filtrarInstancias(datosInstancia);
+        await this.actions.seleccionarFila(datosInstancia.nroInstancia);
         await this.actions.ejecutarAccion();
-        /*await this.datosGeneralesFlow.validarCargaYCompletarDatosGenerales(
-            {
-                tipoPersona: 'Natural',
-                pais: 'Perú',
-                tipoDoc: 'DNI',
-                numDoc: '12345678',
-                tipoSolicitud: 'Vehicular',
-                concesionaria: 'AUTOESPAR',
-                sucursal: 'AU-SAN MIGUEL',
-                vendedor: 'Juan Pérez'
-            }, { validarExito: true });*/
+        
+        await this.datosGeneralesFlow.completarSeccionDatosGenerales(datosInstancia, { validarExito: true });
     }
 }
+
 module.exports = { BandejaTareasFlow };

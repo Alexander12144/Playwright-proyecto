@@ -2,44 +2,24 @@ const { expect } = require('@playwright/test');
 const { IniciarProcesoPage } = require('../pages/InstanciaProcesoPage');
 const { TIMEOUTS } = require('../utils/constants');
 
-/**
- * InstanciaProcesoActions - Orquestación de acciones de instancias de proceso
- * ⚠️ RESPONSABILIDAD: Lógica de negocio de selección e inicio de procesos
- * Compone acciones de IniciarProcesoPage (Page Object)
- */
 class InstanciaProcesoActions {
     constructor(page) {
         this.page = page;
         this.procesoPage = new IniciarProcesoPage(page);
     }
 
-    // ========== VALIDACIONES ==========
-    /**
-     * Validar que la página de iniciar proceso cargó correctamente
-     */
     async validarCarga() {
-        await this.procesoPage.expectVisible(this.procesoPage.titulo, TIMEOUTS.LONG);
+        await expect(this.procesoPage.titulo).toBeVisible({ timeout: TIMEOUTS.LONG });
     }
 
-    /**
-     * Validar que los campos principales están visibles
-     */
     async validarCamposPrincipales() {
-        await this.procesoPage.expectVisible(this.procesoPage.inputAsunto, TIMEOUTS.MEDIUM);
-        await this.procesoPage.expectVisible(this.procesoPage.inputComentario, TIMEOUTS.MEDIUM);
-        await this.procesoPage.expectVisible(this.procesoPage.btnIniciar, TIMEOUTS.MEDIUM);
+        await expect(this.procesoPage.inputAsunto).toBeVisible({ timeout: TIMEOUTS.MEDIUM });
+        await expect(this.procesoPage.inputComentario).toBeVisible({ timeout: TIMEOUTS.MEDIUM });
+        await expect(this.procesoPage.btnIniciar).toBeVisible({ timeout: TIMEOUTS.MEDIUM });
     }
 
     /**
-     * Validar que un flujo específico está visible
-     */
-    async validarFlujoVisible(nombreFlujo) {
-        const flujoLocator = this.procesoPage.getFlujoLocator(nombreFlujo);
-        await expect(flujoLocator).toBeVisible({ timeout: TIMEOUTS.MEDIUM });
-    }
-
-    /**
-     * Validar presencia de múltiples flujos esperados
+     * Valida que una lista predefinida de flujos de negocio esté presente en la UI.
      */
     async validarPresenciaDeFlujos() {
         const flujosEsperados = [
@@ -51,40 +31,33 @@ class InstanciaProcesoActions {
         ];
 
         for (const nombreFlujo of flujosEsperados) {
-            await this.validarFlujoVisible(nombreFlujo);
+            await expect(this.procesoPage.getFlujoLocator(nombreFlujo)).toBeVisible({ 
+                timeout: TIMEOUTS.MEDIUM 
+            });
         }
-
-        // Validar también los campos de entrada
         await this.validarCamposPrincipales();
     }
 
-    // ========== ACCIONES ==========
-
     async ingresarAsunto(asunto) {
-        if (!asunto) return;
-        await this.procesoPage.fill(this.procesoPage.inputAsunto, asunto);
+        if (asunto) await this.procesoPage.inputAsunto.fill(asunto);
     }
 
     async ingresarComentario(comentario) {
-        if (!comentario) return;
-        await this.procesoPage.fill(this.procesoPage.inputComentario, comentario);
+        if (comentario) await this.procesoPage.inputComentario.fill(comentario);
     }
 
     async seleccionarFlujo(nombreFlujo) {
-        const flujoLocator = this.procesoPage.getFlujoLocator(nombreFlujo);
-        await this.procesoPage.click(flujoLocator);
+        await this.procesoPage.getFlujoLocator(nombreFlujo).click();
     }
 
     async clickIniciar() {
-        await this.procesoPage.click(this.procesoPage.btnIniciar);
-        // removed: wait for page-specific elements instead
+        await this.procesoPage.btnIniciar.click();
     }
 
     async clickCancelar() {
-        await this.procesoPage.click(this.procesoPage.btnCancelar);
-        await expect(this.procesoPage.btnCancelar).toBeHidden({ timeout: TIMEOUTS.MEDIUM });
+        await this.procesoPage.btnCancelar.click();
+        await expect(this.procesoPage.btnCancelar).toBeHidden();
     }
-
 }
 
 module.exports = { InstanciaProcesoActions };

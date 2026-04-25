@@ -7,58 +7,61 @@ class DatosGeneralesFlow {
     }
 
     /**
-     * Orquesta el proceso completo de la sección de Datos Generales
      * @param {Object} data - Datos para el formulario
+     * @param {Object} opciones - { validarExito: boolean }
      */
     async completarSeccionDatosGenerales(data = {}, opciones = { validarExito: true }) {
-        await this.actions.validarDatosIniciales();
+        await this.actions.validarCargaSeccion();
         
-        // 1. Llenado Dinámico (Solo interactúa si el dato viene en el test)
+        await this._llenarCamposEnviados(data);
+        await this.actions.ejecutarValidacion();
+
+        if (opciones.validarExito) {
+            await this.actions.continuarSiguiente();
+        } else {
+            await this._gestionarValidacionDeErrores(data);
+        }
+    }
+
+    async _llenarCamposEnviados(data) {
         if (data.tipoPersona) await this.actions.seleccionarTipoPersona(data.tipoPersona);
         if (data.pais) await this.actions.seleccionarPais(data.pais);
         if (data.tipoDoc) await this.actions.seleccionarTipoDoc(data.tipoDoc);
         if (data.numDoc) await this.actions.ingresarNumeroDocumento(data.numDoc);
         if (data.tipoSolicitud) await this.actions.seleccionarTipoSolicitud(data.tipoSolicitud);
-        if (data.concesionaria) await this.actions.seleccionarConcesionaria(data.concesionaria);
         if (data.sucursal) await this.actions.seleccionarSucursal(data.sucursal);
         if (data.vendedor) await this.actions.seleccionarVendedor(data.vendedor);
+    }
 
-        // 2. Ejecutar validación en la UI
-        await this.actions.ejecutarValidacion();
+    /**
+     * Mapea reglas de negocio: si el dato no se envió, se valida el error correspondiente.
+     */
+    async _gestionarValidacionDeErrores(data) {
+        const msg = this.actions.datosPage.MENSAJES_ERROR;
+        const erroresAValidar = [];
 
-        // 3. Verificación Automática
-        if (opciones.validarExito) {
-            await this.actions.continuarSiguiente();
-        } else {
-            const erroresAValidar = [];
-            const msg = this.actions.datosPage.MENSAJES_ERROR;
+        const reglas = [
+            { dato: data.tipoPersona, error: msg.tipoPersona },
+            { dato: data.tipoDoc, error: msg.tipoDoc },
+            { dato: data.numDoc, error: msg.numDoc },
+            { dato: data.tipoSolicitud, error: msg.tipoSolicitud },
+            { dato: data.sucursal, error: msg.sucursal },
+            { dato: data.vendedor, error: msg.vendedor }
+        ];
 
-            // Mapeo de Reglas de Negocio: "Si falta X dato, debe salir Y error"
-            const reglas = [
-                { dato: data.tipoPersona, error: msg.TIPO_PERSONA },
-                { dato: data.tipoDoc, error: msg.TIPO_DOC },
-                { dato: data.numDoc, error: msg.NUM_DOC },
-                { dato: data.tipoSolicitud, error: msg.TIPO_SOLICITUD },
-                { dato: data.concesionaria, error: msg.CONCESIONARIA },
-                { dato: data.sucursal, error: msg.SUCURSAL },
-                { dato: data.vendedor, error: msg.VENDEDOR }
-            ];
+        reglas.forEach(regla => {
+            if (!regla.dato || regla.dato === '') {
+                erroresAValidar.push(regla.error);
+            }
+        });
 
-            // Filtramos solo los que están vacíos o no se enviaron
-            reglas.forEach(regla => {
-                if (!regla.dato || regla.dato === '') {
-                    erroresAValidar.push(regla.error);
-                }
-            });
-
-            // El Action valida todos los errores detectados de un solo golpe
+        if (erroresAValidar.length > 0) {
             await this.actions.validarPresenciaDeErrores(erroresAValidar);
         }
     }
 
     async soloValidarEstructura() {
-        await this.actions.validarDatosIniciales();
-        await this.actions.validarOpcionesTipoSolicitud();
+        await this.actions.validarCargaSeccion();
     }
 }
 

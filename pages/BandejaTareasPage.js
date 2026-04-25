@@ -1,62 +1,57 @@
 const { BasePage } = require('./BasePage');
 
-/**
- * BandejaTareasPage - Page Object
- * ⚠️ RESPONSABILIDAD: SOLO selectores y localizadores
- * Toda la lógica va en BandejaActions.js
- */
 class BandejaTareasPage extends BasePage {
     constructor(page) {
         super(page);
 
-        // Jerarquía de Frames (Ruta confirmada)
+        // Definición de Frames base
         this.framePadre = page.frameLocator('iframe[id="1"]');
-        this.frameBandeja = this.framePadre.frameLocator('iframe[name="process1_step1"]');
-        this.frameStep2 = this.framePadre.frameLocator('iframe[name="process1_step2"]');
-
-        // --- SELECTORES BANDEJA ---
-        this.tituloBandeja = this.frameBandeja.getByText('Bandeja de Entrada de Tareas');
-        
-        // Combos (IDs de Bantotal)
-        this.comboVista = this.frameBandeja.locator('#vVISTA');
-        this.comboRoles = this.frameBandeja.locator('#vWFROLCODFLT');
-        this.comboOrden = this.frameBandeja.locator('#vORDER');
-        
-        // Inputs de filtrado
-        this.inputInstancia = this.frameBandeja.locator('#vBINST');
-        this.inputComentario = this.frameBandeja.locator('#vBCOM');
-        this.btnFiltrar = this.frameBandeja.getByRole('link', { name: 'Filtrar' });
-
-        // Botones de acción
-        this.btnConsultar = this.frameBandeja.getByRole('link', { name: 'Consultar' });
-        this.btnDelegar = this.frameBandeja.getByRole('link', { name: 'Delegar' });
-        this.btnLiberar = this.frameBandeja.getByRole('link', { name: 'Liberar' });
-        this.btnEjecutar = this.frameBandeja.getByRole('link', { name: 'Ejecutar' });
-        this.btnDatosIng = this.frameBandeja.getByRole('link', { name: 'Datos.Ing' });
-        this.btnDocumentos = this.frameBandeja.getByRole('link', { name: 'Documentos' });
-        this.btnImpresos = this.frameBandeja.getByRole('link', { name: 'Impresos' });
-        this.btnAutDisponibles = this.frameBandeja.getByRole('link', { name: 'Aut. Disponibles' });
-        this.btnIniciarProceso = this.frameBandeja.getByRole('link', { name: 'Iniciar Proceso' });
-        
-        // Botones de navegación
-        this.btnAnterior = this.frameBandeja.getByText('<< Anterior');
-        this.btnSiguiente = this.frameBandeja.getByText('Siguiente >>');
-        
-        // Para Step 2 (después de ejecutar)
-        this.btnPagSig = this.frameStep2.getByText('Iniciar Instancia de Proceso');
+        this.baseBandeja = this.framePadre.frameLocator('iframe[name="process1_step1"]');
+        this.baseStep2 = this.framePadre.frameLocator('iframe[name="process1_step2"]');
     }
 
-    // ========== LOCALIZADORES DINÁMICOS ==========
+    // --- Títulos y Filtros ---
+    get tituloBandeja() { return this.baseBandeja.getByText('Bandeja de Entrada de Tareas'); }
+    get comboVista() { return this.baseBandeja.locator('#vVISTA'); }
+    get comboRoles() { return this.baseBandeja.locator('#vWFROLCODFLT'); }
+    get comboOrden() { return this.baseBandeja.locator('#vORDER'); }
+    get inputInstancia() { return this.baseBandeja.locator('#vBINST'); }
+    get inputComentario() { return this.baseBandeja.locator('#vBCOM'); }
+    get btnFiltrar() { return this.baseBandeja.getByRole('link', { name: 'Filtrar' }); }
+
+    // --- Botones de Acción (Bandeja) ---
+    get btnConsultar() { return this.baseBandeja.getByRole('link', { name: 'Consultar' }); }
+    get btnDelegar() { return this.baseBandeja.getByRole('link', { name: 'Delegar' }); }
+    get btnLiberar() { return this.baseBandeja.getByRole('link', { name: 'Liberar' }); }
+    get btnEjecutar() { return this.baseBandeja.getByRole('link', { name: 'Ejecutar' }); }
+    get btnDatosIng() { return this.baseBandeja.getByRole('link', { name: 'Datos.Ing' }); }
+    get btnDocumentos() { return this.baseBandeja.getByRole('link', { name: 'Documentos' }); }
+    get btnImpresos() { return this.baseBandeja.getByRole('link', { name: 'Impresos' }); }
+    get btnAutDisponibles() { return this.baseBandeja.getByRole('link', { name: 'Aut. Disponibles' }); }
+    get btnIniciarProceso() { return this.baseBandeja.getByRole('link', { name: 'Iniciar Proceso' }); }
+
+    // --- Navegación ---
+    get btnAnterior() { return this.baseBandeja.getByText('<< Anterior'); }
+    get btnSiguiente() { return this.baseBandeja.getByText('Siguiente >>'); }
+    get btnPagSig() { return this.baseStep2.getByText('Iniciar Instancia de Proceso'); }
+
+    // --- Localizadores Dinámicos ---
+    /**
+     * @param {string|number} instancia - ID de la instancia a buscar
+     */
     getFilaPorInstancia(instancia) {
-        return this.frameBandeja.getByRole('row', { 
+        return this.baseBandeja.getByRole('row', { 
             name: new RegExp(`^${instancia}\\s`)
         });
     }
 
+    /**
+     * @param {string} valor - Texto de la opción en el combo
+     */
     getOpcionCombo(valor) {
-        return this.frameBandeja
+        return this.baseBandeja
             .getByRole('option', { name: valor, exact: true })
-            .or(this.frameBandeja.getByText(valor, { exact: true }));
+            .or(this.baseBandeja.getByText(valor, { exact: true }));
     }
 }
 

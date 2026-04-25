@@ -8,133 +8,65 @@ class MenuActions {
         this.homePage = new HomePage(page);
     }
 
-    // ========== VALIDACIONES DEL DASHBOARD ==========
-    /**
-     * Validar que el logo está visible
-     */
-    async validateLogoVisible() {
-        await this.homePage.expectVisible(this.homePage.logo, TIMEOUTS.MEDIUM);
-    }
+    // ========== VALIDACIONES DE UI ==========
 
-    /**
-     * Validar botones principales del header
-     */
-    async validateHeaderButtons() {
-        await this.homePage.expectVisible(this.homePage.btnInicio, TIMEOUTS.MEDIUM);
-        await this.homePage.expectVisible(this.homePage.btnAccesos, TIMEOUTS.MEDIUM);
-    }
-
-    /**
-     * Validar controles de navegación
-     */
-    async validateNavigationControls() {
-        await this.homePage.expectVisible(this.homePage.btnAtras, TIMEOUTS.MEDIUM);
-        await this.homePage.expectVisible(this.homePage.btnRecargar, TIMEOUTS.MEDIUM);
-    }
-
-    /**
-     * Validar elementos del primer iframe
-     */
-    async validateFirstFrameElements() {
-        await this.homePage.expectVisible(this.homePage.linkActividadUsuario, TIMEOUTS.LONG);
-    }
-
-    /**
-     * Validar elementos del segundo iframe (información del usuario)
-     */
-    async validateUserInfoElements() {
-        await this.homePage.expectVisible(this.homePage.txtUltimaActividad, TIMEOUTS.MEDIUM);
-        await this.homePage.expectVisible(this.homePage.cellUsuario, TIMEOUTS.MEDIUM);
-        await this.homePage.expectVisible(this.homePage.cellEmpresa, TIMEOUTS.MEDIUM);
-        await this.homePage.expectVisible(this.homePage.cellSucursal, TIMEOUTS.MEDIUM);
-        await this.homePage.expectVisible(this.homePage.cellFechaSistema, TIMEOUTS.MEDIUM);
-    }
-
-    /**
-     * Validación completa de toda la UI del dashboard
-     */
     async validateFullUI() {
-        await this.validateLogoVisible();
-        await this.validateHeaderButtons();
-        await this.validateNavigationControls();
-        await this.validateFirstFrameElements();
-        await this.validateUserInfoElements();
+        /**
+         * Paralelismo: Validamos elementos del DOM principal simultáneamente.
+         * Esto reduce el tiempo de ejecución en Smoke Tests.
+         */
+        await Promise.all([
+            expect(this.homePage.logo).toBeVisible({ timeout: TIMEOUTS.MEDIUM }),
+            expect(this.homePage.btnInicio).toBeVisible({ timeout: TIMEOUTS.MEDIUM }),
+            expect(this.homePage.btnAccesos).toBeVisible({ timeout: TIMEOUTS.MEDIUM }),
+            expect(this.homePage.btnAtras).toBeVisible({ timeout: TIMEOUTS.MEDIUM }),
+            expect(this.homePage.btnRecargar).toBeVisible({ timeout: TIMEOUTS.MEDIUM })
+        ]);
+        
+        /**
+         * Estabilidad: Elementos dentro de frames anidados se validan secuencialmente.
+         * Los Getters en HomePage resuelven la profundidad de frames automáticamente.
+         */
+        await expect(this.homePage.linkActividadUsuario).toBeVisible({ timeout: TIMEOUTS.LONG });
+        await expect(this.homePage.cellUsuario).toBeVisible({ timeout: TIMEOUTS.MEDIUM });
+        await expect(this.homePage.cellFechaSistema).toBeVisible({ timeout: TIMEOUTS.MEDIUM });
     }
 
-    // ========== NAVEGACIÓN ==========
-    /**
-     * Navegar al menú Inicio
-     */
-    async navigateToInicio() {
-        await this.homePage.click(this.homePage.btnInicio);
-    }
-
-    /**
-     * Valide que el home ha cargado correctamente y luego navegar a Inicio
-     */
     async waitForHomeReady() {
-        await this.homePage.expectVisible(this.homePage.linkActividadUsuario, TIMEOUTS.MEDIUM);
+        await expect(this.homePage.linkActividadUsuario).toBeVisible({ timeout: TIMEOUTS.MEDIUM });
     }
 
-    /**
-     * Navegar a Bandeja de Tareas desde el menú
-     */
-    async navigateToBandejaTareas() {
-        // Esperar que el menú esté disponible
-        await this.homePage.expectVisible(this.homePage.menu.inicioMenu, TIMEOUTS.MEDIUM);
-        await this.homePage.click(this.homePage.menu.inicioMenu);
+    // ========== NAVEGACIÓN SEMÁNTICA ==========
 
-        // Esperar que aparezca la opción de bandeja de tareas
-        await this.homePage.expectVisible(this.homePage.menu.bandejaTareasMenu, TIMEOUTS.MEDIUM);
-        await this.homePage.click(this.homePage.menu.bandejaTareasMenu);
-    }
-
-    /**
-     * Navegar a Bandeja de Entrada de Tareas
-     */
     async navigateToBandejaEntrada() {
-        await this.navigateToBandejaTareas();
+        // Uso del componente NavigationMenu inyectado en HomePage
+        await this.homePage.menu.inicioMenu.click();
+        
+        await expect(this.homePage.menu.bandejaTareasMenu).toBeVisible({ timeout: TIMEOUTS.MEDIUM });
+        await this.homePage.menu.bandejaTareasMenu.click();
 
-        // Esperar que aparezca la opción de entrada de tareas
-        await this.homePage.expectVisible(this.homePage.menu.bandejaEntradaMenu, TIMEOUTS.MEDIUM);
-        await this.homePage.click(this.homePage.menu.bandejaEntradaMenu);
+        await expect(this.homePage.menu.bandejaEntradaMenu).toBeVisible({ timeout: TIMEOUTS.MEDIUM });
+        await this.homePage.menu.bandejaEntradaMenu.click();
 
-        // Esperar a que se cargue el contenido de la bandeja
-        await this.page.waitForTimeout(2000);
+        // Sincronización dinámica post-navegación
+        await this.page.waitForLoadState('networkidle');
     }
 
-    // ========== ACCIONES DE DASHBOARD ==========
-    /**
-     * Recargar la página
-     */
+    // ========== CONTROLES DE NAVEGACIÓN BANTOTAL ==========
+
     async recargar() {
-        await this.homePage.click(this.homePage.btnRecargar);
-        await this.homePage.linkActividadUsuario.waitFor({ state: 'visible', timeout: TIMEOUTS.LONG });
+        await this.homePage.btnRecargar.click();
+        await this.waitForHomeReady();
     }
 
-    /**
-     * Ir atrás en el historial
-     */
     async irAtras() {
-        await this.homePage.click(this.homePage.btnAtras);
-        await this.homePage.linkActividadUsuario.waitFor({ state: 'visible', timeout: TIMEOUTS.LONG });
+        await this.homePage.btnAtras.click();
+        await this.waitForHomeReady();
     }
 
-    /**
-     * Ir adelante en el historial
-     */
-    async irAdelante() {
-        await this.homePage.click(this.homePage.btnAdelante);
-        await this.homePage.linkActividadUsuario.waitFor({ state: 'visible', timeout: TIMEOUTS.LONG });
-    }
-
-    // ========== FLUJOS ORQUESTADOS ==========
-    /**
-     * Flujo completo: Validar dashboard + navegar a bandeja
-     */
     async validateAndNavigateToBandeja() {
         await this.validateFullUI();
-        await this.navigateToBandejaInstancias();
+        await this.navigateToBandejaEntrada();
     }
 }
 

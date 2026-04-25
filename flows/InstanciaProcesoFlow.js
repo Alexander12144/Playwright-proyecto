@@ -3,32 +3,27 @@ const { InstanciaProcesoActions } = require('../actions/InstanciaProcesoActions'
 class InstanciaProcesoFlow {
     constructor(page) {
         this.page = page;
-        this.instanciaProcesoActions = new InstanciaProcesoActions(page);
+        this.actions = new InstanciaProcesoActions(page);
     }
 
-    // ========== FLUJOS COMPLETOS ==========
     /**
-     * Seleccionar flujo, llenar datos e iniciar proceso
-     * @param {string} nombreFlujo - Ej: 'Flujo Vehicular / StartSolicitud'
-     * @param {Object} datos - { asunto: '...', comentario: '...' }
+     * @param {string} nombreFlujo - Nombre del proceso en la lista
+     * @param {Object} datos - { asunto: string, comentario: string }
      */
     async seleccionarFlujoEIniciar(nombreFlujo, datos = {}) {
-        await this.instanciaProcesoActions.seleccionarFlujo(nombreFlujo);
-        await this.instanciaProcesoActions.ingresarAsunto(datos.asunto);
-        await this.instanciaProcesoActions.ingresarComentario(datos.comentario);
-        await this.instanciaProcesoActions.clickIniciar();
+        await this.actions.seleccionarFlujo(nombreFlujo);
+        await this.actions.ingresarAsunto(datos.asunto);
+        await this.actions.ingresarComentario(datos.comentario);
+        await this.actions.clickIniciar();
     }
 
-    // ========== FLUJOS ORQUESTADOS ==========
     /**
-     * Flujo completo: Validar carga + validar flujos + seleccionar e iniciar
-     * @param {string} nombreFlujo
-     * @param {Object} datos
+     * Realiza validaciones de estructura antes de iniciar el flujo solicitado.
      */
     async validarYSeleccionarFlujo(nombreFlujo, datos = {}) {
-        await this.instanciaProcesoActions.validarCarga();
-        await this.instanciaProcesoActions.validarPresenciaDeFlujos();
-        await this.instanciaProcesoActions.seleccionarFlujoEIniciar(nombreFlujo, datos);
+        await this.actions.validarCarga();
+        await this.actions.validarPresenciaDeFlujos();
+        await this.seleccionarFlujoEIniciar(nombreFlujo, datos);
     }
 }
 
