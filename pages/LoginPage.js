@@ -3,47 +3,27 @@ const { BasePage } = require('./BasePage');
 class LoginPage extends BasePage {
     constructor(page) {
         super(page);
-
-        this.usernameInput = page.locator('#vUSER');
-        this.passwordInput = page.locator('#vPASSWORD');
-        this.loginButton = page.getByRole('link', {name: 'Iniciar Sesión'});
-        this.loginErrorMessage = page.locator('text=Invalid credentials/Credenciales inválidas');
-        this.invalidPassword = page.getByText('Contraseña inválida, no puede');
-        this.message = page.getByText("Sesión iniciada");
     }
 
-    async navigate() {
-        await this.goto('/mafgx16/servlet/com.dlya.bantotal.hlogin');
+    // --- Inputs de Credenciales ---
+    get usernameInput() { return this.page.locator('#vUSER'); }
+    get passwordInput() { return this.page.locator('#vPASSWORD'); }
+    
+    // --- Botones ---
+    get loginButton() { return this.page.getByRole('link', { name: 'Iniciar Sesión' }); }
+
+    // --- Mensajes de Validación ---
+    get invalidPasswordloginErrorMessage() { 
+        return this.page.locator('text=Invalid credentials/Credenciales inválidas'); 
     }
-
-    async fillCredentials(username, password) {
-        await this.fill(this.usernameInput, username);
-        await this.fill(this.passwordInput, password);
+    
+    get invalidPassword() { 
+        return this.page.getByText('Contraseña inválida, no puede'); 
     }
-
-    async submit() {
-        const [newPage] = await Promise.all([
-            this.page.context().waitForEvent('page'),
-            this.loginButton.click()
-        ]);
-
-        await newPage.waitForLoadState('domcontentloaded');
-
-        return newPage;
-    }
-
-    async login(username, password) {
-        await this.fillCredentials(username, password);
-        return await this.submit();
-    }
-   
-
-    async loginError (username, password) {
-        await this.fillCredentials(username, password);
-        await this.loginButton.click();
+    
+    get successMessage() { 
+        return this.page.getByText('Sesión iniciada'); 
     }
 }
 
-module.exports = {
-    LoginPage
-};
+module.exports = { LoginPage };

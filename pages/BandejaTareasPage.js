@@ -1,102 +1,58 @@
-const { expect } = require('@playwright/test');
 const { BasePage } = require('./BasePage');
 
-class BandejaInstanciasPage extends BasePage {
+class BandejaTareasPage extends BasePage {
     constructor(page) {
         super(page);
 
-        // Jerarquía de Frames (Ruta confirmada)
+        // Definición de Frames base
         this.framePadre = page.frameLocator('iframe[id="1"]');
-        this.frameBandeja = this.framePadre.frameLocator('iframe[name="process1_step1"]');
+        this.baseBandeja = this.framePadre.frameLocator('iframe[name="process1_step1"]');
+        this.baseStep2 = this.framePadre.frameLocator('iframe[name="process1_step2"]');
+    }
 
-        // --- SELECTORES ---
-        this.tituloBandeja = this.frameBandeja.getByText('Bandeja de Entrada de Tareas');
-        
-        // Localizadores de los Combos (IDs de Bantotal)
-        this.comboVista = this.frameBandeja.locator('#vVISTA');
-        this.comboRoles = this.frameBandeja.locator('#vWFROLCODFLT');
-        this.comboOrden = this.frameBandeja.locator('#vORDER'); // Ajustar si el ID cambia
-        
-        // Otros Filtros
-        this.inputInstancia = this.frameBandeja.locator('#vBINST');
-        this.inputComentario = this.frameBandeja.locator('#vBCOM');
-        this.btnFiltrar = this.frameBandeja.getByRole('link', { name: 'Filtrar' });
+    // --- Títulos y Filtros ---
+    get tituloBandeja() { return this.baseBandeja.getByText('Bandeja de Entrada de Tareas'); }
+    get comboVista() { return this.baseBandeja.locator('#vVISTA'); }
+    get comboRoles() { return this.baseBandeja.locator('#vWFROLCODFLT'); }
+    get comboOrden() { return this.baseBandeja.locator('#vORDER'); }
+    get inputInstancia() { return this.baseBandeja.locator('#vBINST'); }
+    get inputComentario() { return this.baseBandeja.locator('#vBCOM'); }
+    get btnFiltrar() { return this.baseBandeja.getByRole('link', { name: 'Filtrar' }); }
 
-        //Botones de pagina
-        this.btnConsultar = this.frameBandeja.getByRole('link', { name: 'Consultar' });
-        this.btnDelegar = this.frameBandeja.getByRole('link', { name: 'Delegar' });
-        this.btnLiberar = this.frameBandeja.getByRole('link', { name: 'Liberar' });
-        this.btnEjecutar = this.frameBandeja.getByRole('link', { name: 'Ejecutar' });
-        this.btnDatosIng = this.frameBandeja.getByRole('link', { name: 'Datos.Ing' });
-        this.btnDocumentos = this.frameBandeja.getByRole('link', { name: 'Documentos' });
-        this.btnImpresos = this.frameBandeja.getByRole('link', { name: 'Impresos' });
-        this.btnAutDisponibles = this.frameBandeja.getByRole('link', { name: 'Aut. Disponibles' });
-        this.btnIniciarProceso = this.frameBandeja.getByRole('link', { name: 'Iniciar Proceso' });
-        
-        // Selectores de Navegación
-        this.btnAnterior = this.frameBandeja.getByText('<< Anterior');
-        this.btnSiguiente = this.frameBandeja.getByText('Siguiente >>');
-        this.btnPagSig = this.framePadre.frameLocator('iframe[name="process1_step2"]').getByText('Iniciar Instancia de Proceso');
+    // --- Botones de Acción (Bandeja) ---
+    get btnConsultar() { return this.baseBandeja.getByRole('link', { name: 'Consultar' }); }
+    get btnDelegar() { return this.baseBandeja.getByRole('link', { name: 'Delegar' }); }
+    get btnLiberar() { return this.baseBandeja.getByRole('link', { name: 'Liberar' }); }
+    get btnEjecutar() { return this.baseBandeja.getByRole('link', { name: 'Ejecutar' }); }
+    get btnDatosIng() { return this.baseBandeja.getByRole('link', { name: 'Datos.Ing' }); }
+    get btnDocumentos() { return this.baseBandeja.getByRole('link', { name: 'Documentos' }); }
+    get btnImpresos() { return this.baseBandeja.getByRole('link', { name: 'Impresos' }); }
+    get btnAutDisponibles() { return this.baseBandeja.getByRole('link', { name: 'Aut. Disponibles' }); }
+    get btnIniciarProceso() { return this.baseBandeja.getByRole('link', { name: 'Iniciar Proceso' }); }
+
+    // --- Navegación ---
+    get btnAnterior() { return this.baseBandeja.getByText('<< Anterior'); }
+    get btnSiguiente() { return this.baseBandeja.getByText('Siguiente >>'); }
+    get btnPagSig() { return this.baseStep2.getByText('Iniciar Instancia de Proceso'); }
+
+    // --- Localizadores Dinámicos ---
+    /**
+     * @param {string|number} instancia - ID de la instancia a buscar
+     */
+    getFilaPorInstancia(instancia) {
+        return this.baseBandeja.getByRole('row', { 
+            name: new RegExp(`^${instancia}\\s`)
+        });
     }
 
     /**
-     * Método privado para manejar cualquier desplegable de la bandeja
+     * @param {string} valor - Texto de la opción en el combo
      */
-    async _seleccionarDeLista(locatorCombo, valor) {
-        if (!valor) return;
-        
-        // 1. Intentamos la vía rápida y estándar primero (selectOption)
-        // El log mostró <option value="11">, así que esto suele ser lo más estable
-        try {
-            await locatorCombo.selectOption({ label: valor }, { timeout: 2000 });
-        } catch (e) {
-            await locatorCombo.click();
-            
-            const opcion = this.frameBandeja
-                .getByRole('option', { name: valor, exact: true })
-                .or(this.frameBandeja.getByText(valor, { exact: true }));
-
-            await opcion.waitFor({ state: 'attached', timeout: 5000 });
-            
-            // Forzamos el clic aunque Playwright piense que está oculto
-            await opcion.click({ force: true });
-        }
-    }
-
-    async validarCargaCompleta() {
-        await this.expectVisible(this.tituloBandeja, 20000);
-        await this.expectVisible(this.btnFiltrar, 10000);
-    }
-
-    /**
-     * Método Maestro de Búsqueda
-     * @param {Object} filtros - { nroInstancia, vista, rol, comentario, orden }
-     */
-    async buscarInstancia(filtros = {}) {
-        const { nroInstancia, vista, rol, comentario, orden } = filtros;
-
-        // Inputs de texto
-        if (nroInstancia) await this.inputInstancia.fill(nroInstancia.toString());
-        if (comentario) await this.inputComentario.fill(comentario);
-
-        // Desplegables usando la lógica dinámica
-        await this._seleccionarDeLista(this.comboVista, vista);
-        await this._seleccionarDeLista(this.comboRoles, rol);
-        await this._seleccionarDeLista(this.comboOrden, orden);
-
-        // Ejecutar y Sincronizar
-        await this.btnFiltrar.click();
-        await this.page.waitForLoadState('networkidle');
-    }
-
-    async ingresarInicioProceso () {
-        await this.expectVisible(this.btnIniciarProceso, 30000);
-
-        await this.btnIniciarProceso.click();
-        await this.page.waitForLoadState('networkidle');
-
-        await this.expectVisible(this.btnPagSig, 30000);
+    getOpcionCombo(valor) {
+        return this.baseBandeja
+            .getByRole('option', { name: valor, exact: true })
+            .or(this.baseBandeja.getByText(valor, { exact: true }));
     }
 }
 
-module.exports = { BandejaInstanciasPage };
+module.exports = { BandejaTareasPage };
