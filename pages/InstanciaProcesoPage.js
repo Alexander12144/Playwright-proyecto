@@ -1,30 +1,46 @@
+const { expect } = require('@playwright/test');
 const { BasePage } = require('./BasePage');
+const { TIMEOUTS, FRAMES} = require('../utils/constants');
+const { BantotalNavigator } = require('./components/BantotalNavigator');
 
 class IniciarProcesoPage extends BasePage {
     constructor(page) {
         super(page);
-        
-        // Centralización del frame de contenido
-        this.baseFrame = page.frameLocator('iframe[id="1"]').frameLocator('iframe[name="process1_step2"]');
+        this.baseFrame = this.mainFrame.frameLocator(FRAMES.BANDEJA_STEP2);
+        this.nav = new BantotalNavigator(this.baseFrame);
     }
 
-    // --- Títulos y Etiquetas ---
+    // --- Selectores ---
     get titulo() { return this.baseFrame.getByText('Iniciar Instancia de Proceso'); }
-
-    // --- Campos de Entrada ---
     get inputAsunto() { return this.baseFrame.locator('#vASUNTO'); }
     get inputComentario() { return this.baseFrame.locator('#vCOMENTARIO'); }
+    get btnIniciar() { return this.nav.btnIniciar; }
+    get btnCancelar() { return this.nav.btnCancelar; }
 
-    // --- Botones de Acción ---
-    get btnIniciar() { return this.baseFrame.getByRole('link', { name: 'Iniciar' }); }
-    get btnCancelar() { return this.baseFrame.getByRole('link', { name: 'Cancelar' }); }
-
-    // --- Localizadores Dinámicos ---
-    /**
-     * @param {string} nombreFlujo - Nombre exacto del flujo a seleccionar
-     */
     getFlujoLocator(nombreFlujo) {
         return this.baseFrame.getByText(nombreFlujo, { exact: true });
+    }
+
+    // --- Métodos Técnicos (Ex-Actions) ---
+    getPageLoadFrame() {
+        return this.baseFrame;
+    }
+
+    async validarDisponibilidadDeFlujos() {
+        const flujosEsperados = [
+            'Flujo Vehicular / StartCotizacion',
+            'Flujo Vehicular / StartSolicitud',
+            'Flujo Vehicular / StartBatch',
+            'Flujo de Refinanciación',
+            'Flujo de Reprogramación Regular',
+        ];
+
+        for (const nombre of flujosEsperados) {
+            await expect(this.getFlujoLocator(nombre)).toBeVisible({ timeout: TIMEOUTS.MEDIUM });
+        }
+        // Validamos también los inputs principales
+        await expect(this.inputAsunto).toBeVisible();
+        await expect(this.btnIniciar).toBeVisible();
     }
 }
 

@@ -7,7 +7,11 @@
     "test": "npx playwright test",
     "test:headed": "npx playwright test --headed",
     "test:report": "npx playwright show-report",
-    "test:debug": "npx playwright test --debug"
+    "test:debug": "npx playwright test --debug",
+
+    "cucumber": "cucumber-js features/**/*.feature --require support/hooks.js --require step_definitions/**/*.js",
+    "cucumber:smoke": "npm run cucumber -- --tags '@smoke'",
+    "cucumber:parallel": "npm run cucumber -- --parallel 3"
   },
   "keywords": [],
   "author": "",
@@ -19,6 +23,8 @@
     "allure-playwright": "^3.7.1"
   },
   "dependencies": {
+    "@cucumber/cucumber": "^12.8.2",
+    "allure-cucumberjs": "^3.7.1",
     "dotenv": "^17.4.1"
   }
 }

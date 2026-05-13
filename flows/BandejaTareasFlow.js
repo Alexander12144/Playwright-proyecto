@@ -1,52 +1,95 @@
-const { BandejaTareasActions } = require('../actions/BandejaTareasActions');
-const { InstanciaProcesoFlow } = require('../flows/InstanciaProcesoFlow');
-const { DatosGeneralesFlow } = require('../flows/DatosGeneralesFlow');
+const { BandejaTareasPage } = require('../pages/BandejaTareasPage');
+const { InstanciaProcesoFlow } = require('./InstanciaProcesoFlow');
+const { DatosGeneralesFlow } = require('./DatosGeneralesFlow');
+const { DatosPersonaFlow } = require('./DatosPersonaFlow');
+const { TIMEOUTS } = require('../utils/constants');
 
+/**
+ * Orquestador de procesos relacionados con la Bandeja de Tareas.
+ * Gestiona flujos completos: continuación de instancias existentes o creación de nuevas solicitudes.
+ */
 class BandejaTareasFlow {
     constructor(page) {
         this.page = page;
-        this.actions = new BandejaTareasActions(page);
+        this.bandejaPage = new BandejaTareasPage(page);
         this.instanciaProcesoFlow = new InstanciaProcesoFlow(page);
         this.datosGeneralesFlow = new DatosGeneralesFlow(page);
+        this.datosPersonaFlow = new DatosPersonaFlow(page);
     }
 
     /**
-     * @param {string|number} instancia - ID de la tarea
-     * @param {Object} filtros - Criterios de búsqueda opcionales
+     * Gestiona la continuación de una instancia existente completando campos en secuencia.
+     * Precondición: Instancia debe estar accesible en Bandeja de Tareas.
+     * @param {Object} datos - Datos de la instancia y negocio
+     * @param {string} datos.nroInstancia - Número de instancia (requerido)
+     * @param {Object} datos.datosGenerales - Datos para STEP2 (opcional)
+     * @param {Object} datos.datosPersona - Datos para STEP3 (opcional)
+     * @param {Object} [opciones] - Configuración del flujo
+     * @param {boolean} [opciones.validarExito=true] - Validar transiciones exitosas
+     * @param {boolean} [opciones.validarPasoPersona=false] - Completar STEP3 (DatosPersona)
+     * @throws {Error} Si nroInstancia no está definido
+     * @returns {Promise<void>}
      */
-    async ejecutarInstancia(instancia, filtros = {}) {
-        await this.actions.validarCargaCompleta();
-
-        if (Object.keys(filtros).length > 0) {
-            await this.actions.filtrarInstancias(filtros);
+    async continuarInstanciaExistente(datos, opciones = {}) {
+        const config = { validarExito: true, validarPasoPersona: false, ...opciones };
+        const nroInstancia = datos.nroInstancia ?? datos.instancia?.nroInstancia;
+        
+        if (!nroInstancia) {
+            throw new Error('continuarInstanciaExistente: nroInstancia es requerido');
         }
+        
+        await this.bandejaPage.esperarCarga();
+        await this.bandejaPage.filtrarPorInstancia(nroInstancia);
+        await this.bandejaPage.seleccionarFila(nroInstancia);
+        await this.bandejaPage.ejecutarTareaSeleccionada();
 
-        await this.actions.seleccionarFila(instancia);
-        await this.actions.ejecutarAccion();
+        await this.bandejaPage.esperarPaso2Visible();
+
+        // Orquestación secuencial de pasos
+        await this.datosGeneralesFlow.completarSeccion(datos, config);
+        
+        if (config.validarExito && config.validarPasoPersona) {
+            await this.datosPersonaFlow.completarSeccion(datos, { avanzar: true });
+        }
     }
 
     /**
-     * Orquesta la creación desde cero de una solicitud vehicular.
+     * Continúa desde STEP3 avanzando directamente al siguiente paso.
+     * Precondición: Debe estar en página de DatosPersona (STEP3).
+     * @param {Object} [datos={}] - Datos de la persona para completar (opcional)
+     * @param {Object} datos.datosPersona - Información personal del solicitante
+     * @returns {Promise<void>}
      */
-    async crearInstanciaProcesoVehicular(dataCliente = {}) {
-        await this.actions.ingresarInicioProceso();
-        
-        await this.instanciaProcesoFlow.seleccionarFlujoEIniciar('Flujo Vehicular / StartSolicitud');
-        
-        // El flow de datos generales ya tiene sus propias validaciones internas
-        await this.datosGeneralesFlow.completarSeccionDatosGenerales(dataCliente, { validarExito: true });
+    async continuarDesdeDatosPersona(datos = {}) {
+        await this.datosPersonaFlow.completarSeccion(datos, { avanzar: true });
     }
 
     /**
-     * Retoma una instancia existente en la bandeja y completa sus datos.
+     * Inicia una nueva solicitud vehicular desde inicio de proceso.
+     * Precondición: Usuario autenticado en home de Bantotal.
+     * @param {string} nombreProceso - Identificador del flujo (ej: 'Flujo Vehicular / StartSolicitud')
+     * @param {Object} dataCliente - Datos del cliente para completar flujo
+     * @param {Object} dataCliente.datosGenerales - Información general (STEP2)
+     * @param {Object} dataCliente.datosPersona - Información personal (STEP3)
+     * @param {Object} [opciones] - Configuración de validaciones
+     * @param {boolean} [opciones.validarExito=true] - Validar éxito en transiciones
+     * @throws {Error} Si nombreProceso no existe o es inaccesible
+     * @returns {Promise<void>}
      */
-    async continuarInstanciaExistente(datosInstancia = {}) {
-        await this.actions.filtrarInstancias(datosInstancia);
-        await this.actions.seleccionarFila(datosInstancia.nroInstancia);
-        await this.actions.ejecutarAccion();
-        
-        await this.datosGeneralesFlow.completarSeccionDatosGenerales(datosInstancia, { validarExito: true });
+    async crearNuevaSolicitudVehicular(nombreProceso, dataCliente, opciones = {}) {
+        await this.bandejaPage.esperarCarga();
+        await this.bandejaPage.irAInicioProceso();
+        await this.instanciaProcesoFlow.iniciarNuevoProceso(nombreProceso);
+
+        // Completar Datos Generales
+        await this.datosGeneralesFlow.completarSeccion(dataCliente, opciones);
+
+        // Completar datos de Persona
+        if (opciones.validarExito !== false) {
+            await this.datosPersonaFlow.completarSeccion(dataCliente, { avanzar: true });
+        }
     }
+
 }
 
 module.exports = { BandejaTareasFlow };

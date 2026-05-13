@@ -1,57 +1,107 @@
+const { expect } = require('@playwright/test');
 const { BasePage } = require('./BasePage');
+const { TIMEOUTS, FRAMES} = require('../utils/constants');
+const { BantotalNavigator } = require('./components/BantotalNavigator');
 
+/**
+ * Page Object para la Bandeja de Tareas (Step 1).
+ */
 class BandejaTareasPage extends BasePage {
     constructor(page) {
         super(page);
-
-        // Definición de Frames base
-        this.framePadre = page.frameLocator('iframe[id="1"]');
-        this.baseBandeja = this.framePadre.frameLocator('iframe[name="process1_step1"]');
-        this.baseStep2 = this.framePadre.frameLocator('iframe[name="process1_step2"]');
+        this.baseBandeja = this.mainFrame.frameLocator(FRAMES.BANDEJA_STEP1);
+        this.baseStep2 = this.mainFrame.frameLocator(FRAMES.BANDEJA_STEP2);
+        this.nav = new BantotalNavigator(this.baseBandeja);
     }
 
-    // --- Títulos y Filtros ---
     get tituloBandeja() { return this.baseBandeja.getByText('Bandeja de Entrada de Tareas'); }
-    get comboVista() { return this.baseBandeja.locator('#vVISTA'); }
-    get comboRoles() { return this.baseBandeja.locator('#vWFROLCODFLT'); }
-    get comboOrden() { return this.baseBandeja.locator('#vORDER'); }
     get inputInstancia() { return this.baseBandeja.locator('#vBINST'); }
-    get inputComentario() { return this.baseBandeja.locator('#vBCOM'); }
-    get btnFiltrar() { return this.baseBandeja.getByRole('link', { name: 'Filtrar' }); }
-
-    // --- Botones de Acción (Bandeja) ---
-    get btnConsultar() { return this.baseBandeja.getByRole('link', { name: 'Consultar' }); }
-    get btnDelegar() { return this.baseBandeja.getByRole('link', { name: 'Delegar' }); }
-    get btnLiberar() { return this.baseBandeja.getByRole('link', { name: 'Liberar' }); }
-    get btnEjecutar() { return this.baseBandeja.getByRole('link', { name: 'Ejecutar' }); }
-    get btnDatosIng() { return this.baseBandeja.getByRole('link', { name: 'Datos.Ing' }); }
-    get btnDocumentos() { return this.baseBandeja.getByRole('link', { name: 'Documentos' }); }
-    get btnImpresos() { return this.baseBandeja.getByRole('link', { name: 'Impresos' }); }
-    get btnAutDisponibles() { return this.baseBandeja.getByRole('link', { name: 'Aut. Disponibles' }); }
+    
+    get btnFiltrar() { return this.nav.btnFiltrar; }
+    get btnEjecutar() { return this.nav.btnEjecutar; }
+    
     get btnIniciarProceso() { return this.baseBandeja.getByRole('link', { name: 'Iniciar Proceso' }); }
+    get indicatorStep2() { return this.baseStep2.getByText('Iniciar Instancia de Proceso'); }
 
-    // --- Navegación ---
-    get btnAnterior() { return this.baseBandeja.getByText('<< Anterior'); }
-    get btnSiguiente() { return this.baseBandeja.getByText('Siguiente >>'); }
-    get btnPagSig() { return this.baseStep2.getByText('Iniciar Instancia de Proceso'); }
+    getPageLoadFrame() {
+        return this.baseBandeja;
+    }
 
-    // --- Localizadores Dinámicos ---
-    /**
-     * @param {string|number} instancia - ID de la instancia a buscar
-     */
-    getFilaPorInstancia(instancia) {
-        return this.baseBandeja.getByRole('row', { 
-            name: new RegExp(`^${instancia}\\s`)
-        });
+    async ejecutarTareaSeleccionada() {
+        await this.click(() => this.btnEjecutar, () => this.baseBandeja);
+        await this.waitForFrameStable(this.baseStep2);
     }
 
     /**
-     * @param {string} valor - Texto de la opción en el combo
+     * Filtra la bandeja por número de instancia usando escritura secuencial.
+     * @param {string|number} instancia
      */
-    getOpcionCombo(valor) {
-        return this.baseBandeja
-            .getByRole('option', { name: valor, exact: true })
-            .or(this.baseBandeja.getByText(valor, { exact: true }));
+    async filtrarPorInstancia(instancia) {
+        if (!instancia) {
+            throw new Error('filtrarPorInstancia: nroInstancia es requerido');
+        }
+
+        await this.inputInstancia.focus();
+        await this.inputInstancia.press('Control+a');
+        await this.inputInstancia.press('Backspace');
+        await this.inputInstancia.pressSequentially(instancia.toString(), { delay: 50 });
+        await this.inputInstancia.press('Enter');
+
+        // Esperar brevemente a que se aplique el filtro
+        await this.page.waitForTimeout(500);
+    }
+
+    /**
+     * Selecciona la fila que coincide con el número de instancia.
+     * @param {string|number} instancia
+     */
+    async seleccionarFila(instancia) {
+        if (!instancia) {
+            throw new Error('seleccionarFila: nroInstancia es requerido');
+        }
+
+        const instanciaStr = instancia.toString();
+        
+        // Estrategia: buscar celdas que contengan exactamente la instancia, luego subir a la fila padre
+        // Usamos nth-of-type para asegurar que tomamos solo filas de datos (no encabezados)
+        const fila = this.baseBandeja
+            .locator('tr:has(td)')  // Solo filas que contengan TD (excluye header/footer)
+            .filter({ hasText: instanciaStr });
+
+        // Verificar que se encontró al menos una fila
+        const count = await fila.count();
+        if (count === 0) {
+            throw new Error(`No se encontró fila con instancia ${instanciaStr} en la bandeja`);
+        }
+
+        await expect(fila.first()).toBeVisible({ timeout: TIMEOUTS.LONG });
+        await this.click(fila.first(), this.baseBandeja);
+    }
+
+    /**
+     * Navega a la pantalla de Inicio de Proceso.
+     */
+    async irAInicioProceso() {
+        await this.click(this.btnIniciarProceso);
+        await expect(this.indicatorStep2).toBeVisible({ timeout: TIMEOUTS.LONG });
+    }
+
+    async esperarPaso2Visible() {
+        await this.waitForFrameStable(this.baseStep2);
+        await expect(this.indicatorStep2).toBeVisible({ timeout: TIMEOUTS.LONG });
+    }
+
+    /**
+     * Fallback para combos difíciles en Bantotal
+     */
+    async seleccionarCombo(locator, valor) {
+        if (!valor) return;
+        try {
+            await locator.selectOption({ label: valor }, { timeout: 2000 });
+        } catch (e) {
+            await locator.click();
+            await this.baseBandeja.getByText(valor, { exact: true }).click({ force: true });
+        }
     }
 }
 

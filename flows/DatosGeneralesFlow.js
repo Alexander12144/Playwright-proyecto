@@ -1,67 +1,74 @@
-const { DatosGeneralesActions } = require('../actions/DatosGeneralesActions');
+const { DatosGeneralesPage } = require('../pages/DatosGeneralesPage');
+const { TIMEOUTS, FRAMES } = require('../utils/constants');
 
+/**
+ * Orquestador para completar la sección de Datos Generales (STEP2).
+ * Maneja el llenado de campos obligatorios y validación de transición a STEP3.
+ */
 class DatosGeneralesFlow {
     constructor(page) {
         this.page = page;
-        this.actions = new DatosGeneralesActions(page);
+        this.datosPage = new DatosGeneralesPage(page);
     }
 
     /**
-     * @param {Object} data - Datos para el formulario
-     * @param {Object} opciones - { validarExito: boolean }
+     * Completa la sección de Datos Generales y valida transición a STEP3.
+     * Precondición: Página STEP2 debe estar visible.
+     * @param {Object} [data={}] - Datos generales del cliente
+     * @param {string} data.tipoPersona - Tipo de persona (PF/PJ)
+     * @param {string} data.tipoDoc - Tipo de documento
+     * @param {string} data.numDoc - Número de documento
+     * @param {string} data.tipoSolicitud - Tipo de solicitud
+     * @param {string} data.sucursal - Sucursal
+     * @param {string} data.vendedor - Vendedor asignado
+     * @param {Object} [opciones={}] - Configuración del paso
+     * @param {boolean} [opciones.validarExito=true] - Avanzar a STEP3 después de completar
+     * @throws {Error} Si alguna validación de campos falla
+     * @throws {Error} Si transición a STEP3 no se completa en timeout
+     * @returns {Promise<void>}
      */
-    async completarSeccionDatosGenerales(data = {}, opciones = { validarExito: true }) {
-        await this.actions.validarCargaSeccion();
+    async completarSeccion(data = {}, opciones = { validarExito: true }) {
+        const datosGenerales = data.datosGenerales ?? data;
         
-        await this._llenarCamposEnviados(data);
-        await this.actions.ejecutarValidacion();
+        await this.datosPage.esperarCarga();
+        await this.datosPage.completarDatosGenerales(datosGenerales);
 
         if (opciones.validarExito) {
-            await this.actions.continuarSiguiente();
+            await this.datosPage.click(() => this.datosPage.linkSiguiente, this.datosPage.baseFrame);
+            const step3Frame = this.datosPage.page.frameLocator(FRAMES.BANDEJA_STEP3);
+            await step3Frame.waitFor({ state: 'visible', timeout: TIMEOUTS.PROCESSING_MAX });
         } else {
-            await this._gestionarValidacionDeErrores(data);
+            await this.datosPage.ejecutarValidacion();
+            await this._gestionarErrores(datosGenerales);
         }
-    }
-
-    async _llenarCamposEnviados(data) {
-        if (data.tipoPersona) await this.actions.seleccionarTipoPersona(data.tipoPersona);
-        if (data.pais) await this.actions.seleccionarPais(data.pais);
-        if (data.tipoDoc) await this.actions.seleccionarTipoDoc(data.tipoDoc);
-        if (data.numDoc) await this.actions.ingresarNumeroDocumento(data.numDoc);
-        if (data.tipoSolicitud) await this.actions.seleccionarTipoSolicitud(data.tipoSolicitud);
-        if (data.sucursal) await this.actions.seleccionarSucursal(data.sucursal);
-        if (data.vendedor) await this.actions.seleccionarVendedor(data.vendedor);
     }
 
     /**
-     * Mapea reglas de negocio: si el dato no se envió, se valida el error correspondiente.
+     * Valida la presencia de mensajes de error esperados.
+     * Se ejecuta cuando validarExito=false. Verifica que faltenén campos requeridos muestren mensajes adecuados.
+     * @private
+     * @param {Object} data - Datos incompletos para validación
+     * @returns {Promise<void>}
+     * @throws {Error} Si algún error esperado no se muestra
      */
-    async _gestionarValidacionDeErrores(data) {
-        const msg = this.actions.datosPage.MENSAJES_ERROR;
-        const erroresAValidar = [];
+    async _gestionarErrores(data) {
+        const msg = this.datosPage.MENSAJES_ERROR;
+        
+        // Mapeo de relación: Propiedad del objeto 'data' vs Propiedad del objeto 'MESSAGES'
+        const camposObligatorios = {
+            tipoPersona: msg.tipoPersona,
+            tipoDoc: msg.tipoDoc,
+            numDoc: msg.numDoc,
+            tipoSolicitud: msg.tipoSolicitud,
+            sucursal: msg.sucursal,
+            vendedor: msg.vendedor
+        };
 
-        const reglas = [
-            { dato: data.tipoPersona, error: msg.tipoPersona },
-            { dato: data.tipoDoc, error: msg.tipoDoc },
-            { dato: data.numDoc, error: msg.numDoc },
-            { dato: data.tipoSolicitud, error: msg.tipoSolicitud },
-            { dato: data.sucursal, error: msg.sucursal },
-            { dato: data.vendedor, error: msg.vendedor }
-        ];
+        const erroresAValidar = Object.keys(camposObligatorios)
+            .filter(key => !data[key])
+            .map(key => camposObligatorios[key]);
 
-        reglas.forEach(regla => {
-            if (!regla.dato || regla.dato === '') {
-                erroresAValidar.push(regla.error);
-            }
-        });
-
-        if (erroresAValidar.length > 0) {
-            await this.actions.validarPresenciaDeErrores(erroresAValidar);
-        }
-    }
-
-    async soloValidarEstructura() {
-        await this.actions.validarCargaSeccion();
+        await this.datosPage.validarErrores(erroresAValidar);
     }
 }
 

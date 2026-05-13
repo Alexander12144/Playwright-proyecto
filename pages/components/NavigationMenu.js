@@ -1,18 +1,18 @@
-/**
- * NavigationMenu - Componente de navegación reutilizable
- * Ubicación sugerida: ./components/NavigationMenu.js
- */
 class NavigationMenu {
     constructor(page) {
         this.page = page;
     }
+
+    /**
+     * Localizadores para el menú de navegación.
+     */
 
     // --- Niveles Principales ---
     get inicioMenu() { return this.page.getByText('Inicio'); }
     get bandejaTareasMenu() { return this.page.getByText('Bandeja de Tareas'); }
     get bandejaEntradaMenu() { return this.page.getByText('Bandeja de Entrada de Tareas'); }
 
-    // --- Menús Específicos de Negocio ---
+    // --- Menús Específicos de Negocio (sin constantes aún, se mantienen literales)
     get cobranzasJudicial() { return this.page.getByText('Menú de Cobranzas Judicial'); }
     get instalacionBantotal() { return this.page.getByText('Menú de Instalación de Bantotal'); }
     get ingresoOperaciones() { return this.page.getByText('Menú de Ingreso de Operaciones'); }

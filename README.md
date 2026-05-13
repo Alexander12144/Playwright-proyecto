@@ -44,5 +44,4 @@ npm test
 - `headless` está desactivado en la configuración para facilitar la depuración.
 - `ignoreHTTPSErrors` está habilitado para entornos con certificados autofirmados.
 - Se agregó `pages/BasePage.js` para centralizar comportamiento común de los page objects.
-- Se usa `utils/pageActions.js` para acciones repetidas y esperas confiables.
 - Si necesitas añadir más pasos comunes, usa `utils/` para helpers compartidos.
