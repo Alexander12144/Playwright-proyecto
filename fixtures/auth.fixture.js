@@ -1,7 +1,8 @@
 const base = require('@playwright/test');
 const { AuthFlows } = require('../flows/AuthFlows');
 const { MenuFlow } = require('../flows/MenuFlow');
-const { BandejaTareasFlow } = require('../flows/BandejaTareasFlow');
+const { BandejaTareasFlow } = require('../flows/BandejaTareasFlow/BandejaTareasFlow');
+const { OperacionesVehicularesFlow } = require('../flows/ConsultasBasicasFlow/OperacionesVehicularesFlow');
 
 exports.test = base.test.extend({
     // Fixture para tests de Login (página limpia)
@@ -30,7 +31,13 @@ exports.test = base.test.extend({
     // Fixture para la bandeja (inyectamos la página autenticada)
     bandejaFlow: async ({ authenticatedPage }, use) => {
         await use(new BandejaTareasFlow(authenticatedPage));
+    },
+
+    // Fixture para Consulta de Operaciones Vehiculares (inyectamos la página autenticada)
+    operacionesVehicularesFlow: async ({ authenticatedPage }, use) => {
+        await use(new OperacionesVehicularesFlow(authenticatedPage));
     }
+    
 });
 
 exports.expect = base.expect;

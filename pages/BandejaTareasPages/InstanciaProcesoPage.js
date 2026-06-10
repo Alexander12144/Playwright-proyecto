@@ -1,16 +1,16 @@
 const { expect } = require('@playwright/test');
-const { BasePage } = require('./BasePage');
-const { TIMEOUTS, FRAMES} = require('../utils/constants');
-const { BantotalNavigator } = require('./components/BantotalNavigator');
+const { BasePage } = require('../BasePage');
+const { TIMEOUTS, FRAMES} = require('../../utils/constants');
+const { BantotalNavigator } = require('../components/BantotalNavigator');
 
 class IniciarProcesoPage extends BasePage {
     constructor(page) {
         super(page);
-        this.baseFrame = this.mainFrame.frameLocator(FRAMES.BANDEJA_STEP2);
+        this.frameSelector = FRAMES.BANDEJA_STEP2;
         this.nav = new BantotalNavigator(this.baseFrame);
     }
 
-    // --- Selectores ---
+    get baseFrame() { return this.mainFrame.frameLocator(this.frameSelector); }
     get titulo() { return this.baseFrame.getByText('Iniciar Instancia de Proceso'); }
     get inputAsunto() { return this.baseFrame.locator('#vASUNTO'); }
     get inputComentario() { return this.baseFrame.locator('#vCOMENTARIO'); }
@@ -21,12 +21,16 @@ class IniciarProcesoPage extends BasePage {
         return this.baseFrame.getByText(nombreFlujo, { exact: true });
     }
 
-    // --- Métodos Técnicos (Ex-Actions) ---
     getPageLoadFrame() {
         return this.baseFrame;
     }
 
+    getPageLoadLocators() {
+        return [this.titulo];
+    }
+
     async validarDisponibilidadDeFlujos() {
+        await this.esperarCarga();
         const flujosEsperados = [
             'Flujo Vehicular / StartCotizacion',
             'Flujo Vehicular / StartSolicitud',
@@ -38,7 +42,6 @@ class IniciarProcesoPage extends BasePage {
         for (const nombre of flujosEsperados) {
             await expect(this.getFlujoLocator(nombre)).toBeVisible({ timeout: TIMEOUTS.MEDIUM });
         }
-        // Validamos también los inputs principales
         await expect(this.inputAsunto).toBeVisible();
         await expect(this.btnIniciar).toBeVisible();
     }

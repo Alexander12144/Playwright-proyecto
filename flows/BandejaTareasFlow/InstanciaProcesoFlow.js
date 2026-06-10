@@ -1,5 +1,5 @@
-const { IniciarProcesoPage } = require('../pages/InstanciaProcesoPage');
-const { TIMEOUTS, FRAMES } = require('../utils/constants');
+const { IniciarProcesoPage } = require('../../pages/BandejaTareasPages/InstanciaProcesoPage');
+const { TIMEOUTS, FRAMES } = require('../../utils/constants');
 
 /**
  * Orquestador para iniciar un nuevo flujo/proceso en Bantotal.

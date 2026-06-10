@@ -22,7 +22,6 @@ class MenuFlow {
      */
     async irABandejaDeEntrada() {
         await this.homePage.esperarCarga();
-        
         await this.homePage.menu.inicioMenu.click();
         
         await expect(this.homePage.menu.bandejaTareasMenu).toBeVisible({ timeout: TIMEOUTS.MEDIUM });
@@ -30,8 +29,19 @@ class MenuFlow {
 
         await expect(this.homePage.menu.bandejaEntradaMenu).toBeVisible({ timeout: TIMEOUTS.MEDIUM });
         await this.homePage.menu.bandejaEntradaMenu.click();
+    }
 
-        //await this.page.waitForLoadState('networkidle');
+    async irAConsultaOperacionesVehiculares() {
+        await this.homePage.esperarCarga();
+        await this.homePage.menu.inicioMenu.click();
+
+        await expect(this.homePage.menu.consultasBasicasMenu).toBeVisible({ timeout: TIMEOUTS.MEDIUM });
+        await this.homePage.menu.consultasBasicasMenu.click();
+
+        await expect(this.homePage.menu.consultaOperacionesVehiculares).toBeVisible({ timeout: TIMEOUTS.MEDIUM });
+        await this.homePage.menu.consultaOperacionesVehiculares.click();
+
+        await this.page.waitForLoadState('networkidle');
     }
 
     /**

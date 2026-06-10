@@ -33,7 +33,7 @@ module.exports = defineConfig({
     },
 
     trace: 'on-first-retry',
-    screenshot: 'on', // Cáptura todo para ver qué pasa en cada paso
+    screenshot: 'only-on-failure', // Guardar capturas solo en fallos para reducir ruidos para reducir ruido
     video: 'on-first-retry',
 
     locale: 'es-PE',

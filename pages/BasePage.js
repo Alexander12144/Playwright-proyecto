@@ -1,5 +1,5 @@
 const { expect } = require('@playwright/test');
-const { TIMEOUTS, URLS, FRAMES } = require('../utils/constants');
+const { TIMEOUTS, FRAMES } = require('../utils/constants');
 
 /**
  * Clase base para todas las Page Objects.
@@ -9,8 +9,6 @@ const { TIMEOUTS, URLS, FRAMES } = require('../utils/constants');
 class BasePage {
     constructor(page) {
         this.page = page;
-        this.url = URLS.BASE;
-        
     }
 
     /**
@@ -22,67 +20,80 @@ class BasePage {
     }
 
     /**
-     * Ejecuta una acción sobre un elemento con reintentos automáticos.
-     * Maneja errores de frame stale y contextos destruidos.
-     * @private
-     * @param {Function|Locator} locator - Localizador o función que retorna localizador
-     * @param {Function|Frame|Page} context - Contexto donde ejecutar acción
-     * @param {Function} callback - Función que ejecuta la acción
-     * @param {Object} [options] - Opciones de reintento
-     * @param {number} [options.retries=3] - Número de reintentos
-     * @param {number} [options.retryDelayMs=500] - Delay entre reintentos
-     * @throws {Error} Si la acción falla después de todos los reintentos
+     * Determina si un error se debe a un frame stale o contexto destruido.
+     * @param {Error} error
+     * @returns {boolean}
+     */
+    _isFrameRefreshIssue(error) {
+        const message = (error && error.message ? error.message : '').toLowerCase();
+        return message.includes('target page, context or browser has been closed') ||
+            message.includes('execution context was destroyed') ||
+            message.includes('frame was detached');
+    }
+
+    /**
+     * Captura un screenshot al reintentar una acción fallida.
+     * @param {number} attempt
      * @returns {Promise<void>}
      */
-    async _executeAction(locator, context, callback, options = {}) {
-        const retries = options.retries ?? 3;
+    async _captureRetryScreenshot(attempt) {
+        try {
+            const screenshotPath = `./tmp/retry-${Date.now()}-${attempt}.png`;
+            await this.page.screenshot({ path: screenshotPath, fullPage: false });
+        } catch {
+            // No interrumpir si la captura falla.
+        }
+    }
+
+    /**
+     * Resuelve un locator o función que retorna un locator.
+     * @param {Function|Locator} locator
+     * @returns {Locator}
+     */
+    _resolveLocator(locator) {
+        return typeof locator === 'function' ? locator() : locator;
+    }
+
+    /**
+     * Resuelve un contexto (frame/page) o función que lo retorna.
+     * @param {Function|Frame|Page} context
+     * @returns {Frame|Page}
+     */
+    _resolveContext(context) {
+        return typeof context === 'function' ? context() : context;
+    }
+
+    /**
+     * Ejecuta una acción con reintentos automáticos y espera a que el locator sea visible.
+     * @param {Function|Locator} locator
+     * @param {Function|Frame|Page} context
+     * @param {Function} callback
+     * @param {{retries?: number, retryDelayMs?: number}} [options={}] 
+     * @returns {Promise<void>}
+     */
+    async _performAction(locator, context, callback, options = {}) {
+        const retries = options.retries ?? 5;
         const retryDelayMs = options.retryDelayMs ?? 500;
         let lastError;
 
         for (let attempt = 1; attempt <= retries; attempt++) {
             try {
-                // Re-resolver en cada intento evita locators/frames stale tras refresh.
-                const frame = typeof context === 'function' ? context() : context;
-                const target = typeof locator === 'function' ? locator() : locator;
+                const frame = this._resolveContext(context);
+                const target = this._resolveLocator(locator);
                 await target.waitFor({ state: 'visible', timeout: TIMEOUTS.VERY_LONG });
                 await callback(target, frame);
                 return;
             } catch (error) {
                 lastError = error;
-                const msg = (error && error.message ? error.message : '').toLowerCase();
-                const isFrameRefreshIssue =
-                    msg.includes('target page, context or browser has been closed') ||
-                    msg.includes('execution context was destroyed') ||
-                    msg.includes('frame was detached');
-
-                if (!isFrameRefreshIssue || attempt === retries) {
+                if (!this._isFrameRefreshIssue(error) || attempt === retries) {
                     throw error;
                 }
-
-                try {
-                    const screenshotPath = `./tmp/retry-${Date.now()}-${attempt}.png`;
-                    await this.page.screenshot({ path: screenshotPath, fullPage: false });
-                } catch (screenshotError) {
-                    // Continuar si no se puede guardar screenshot
-                }
-
+                await this._captureRetryScreenshot(attempt);
                 await this.page.waitForTimeout(retryDelayMs);
             }
         }
 
         throw lastError;
-    }
-
-    /**
-     * Navega a una URL y espera carga completa de página.
-     * @param {string} path - Ruta o URL completa
-     * @param {Object} [options] - Opciones de navegación de Playwright
-     * @throws {Error} Si navegación falla
-     * @returns {Promise<void>}
-     */
-    async goto(path, options = {}) {
-        await this.page.goto(path, options);
-        await this.page.waitForLoadState('load');
     }
 
     /**
@@ -97,6 +108,10 @@ class BasePage {
     async esperarCarga() {
         if (typeof this._ensurePageLoad === 'function') {
             return await this._ensurePageLoad();
+        }
+
+        if (this.frameSelector && typeof this.getPageLoadLocators === 'function') {
+            return await this._ensurePageLoadForFrames([this.frameSelector], this.getPageLoadLocators(), 'esperarCarga: no se detectó frame activo para selector');
         }
 
         const frames = [];
@@ -138,7 +153,6 @@ class BasePage {
      */
     async _ensurePageLoadForFrames(possibleFrames, elementChecks, errorMessage) {
         const quickTimeout = 1000;
-        const pollInterval = 200;
 
         for (const frameSel of possibleFrames) {
             this.frameSelector = frameSel;
@@ -146,14 +160,10 @@ class BasePage {
             try {
                 await this.waitForFrameStable(this.baseFrame);
 
-                const checks = elementChecks.map(check => {
-                    return typeof check === 'function' ? check(this.baseFrame) : check;
-                });
-
+                const checks = elementChecks.map(check => typeof check === 'function' ? check(this.baseFrame) : check);
                 await Promise.race(checks.map(locator => expect(locator).toBeVisible({ timeout: quickTimeout })));
                 return;
             } catch {
-                // Continuar al siguiente frame
             }
         }
 
@@ -169,15 +179,14 @@ class BasePage {
      * @returns {Promise<void>}
      */
     async selectOption(locator, value, context = this.page) {
-        await this._executeAction(locator, context, async (el) => {
+        await this._performAction(locator, context, async (el) => {
             const current = await el.inputValue().catch(() => '');
             if (current === value) return;
 
-            // Sincronización para combos que cargan opciones vía AJAX
             await el.evaluate(async (sel) => {
                 const start = Date.now();
-                while (sel.options.length <= 1 && (Date.now() - start) < 9000) {
-                    await new Promise(r => setTimeout(r, 900));
+                while (sel.options.length <= 1 && Date.now() - start < 9000) {
+                    await new Promise((resolve) => setTimeout(resolve, 900));
                 }
             }).catch(() => {});
 
@@ -197,13 +206,29 @@ class BasePage {
      * @returns {Promise<void>}
      */
     async fill(locator, value, context = this.page) {
-        await this._executeAction(locator, context, async (el) => {
+        await this._performAction(locator, context, async (el) => {
             const str = value.toString();
             const current = await el.inputValue().catch(() => '');
             if (current === str) return;
             await el.fill(str);
-            await el.press('Tab'); 
+            await el.press('Tab');
         }, { retries: 4, retryDelayMs: 500 });
+    }
+
+    /**
+     * Escribe texto en un campo con la particularidad de Bantotal.
+     * @param {Locator} locator - Campo de entrada a completar.
+     * @param {string|number} valor - Valor a escribir.
+     */
+    async completarCampo(locator, valor) {
+        if (valor == null || valor === '') return;
+
+        await locator.focus();
+        await locator.press('Control+a');
+        await locator.press('Backspace');
+        await locator.type(valor.toString(), { delay: 50 });
+        await locator.press('Tab');
+        await this.page.waitForTimeout(500);
     }
 
     /**
@@ -213,7 +238,7 @@ class BasePage {
      * @returns {Promise<void>}
      */
     async clear(locator, context = this.page) {
-        await this._executeAction(locator, context, async (el) => {
+        await this._performAction(locator, context, async (el) => {
             await el.focus();
             await el.press('Control+A');
             await el.press('Backspace');
@@ -240,7 +265,7 @@ class BasePage {
             } else {
                 await this.selectOption(field.locator, value, frame);
             }
-        };
+        }
     }
 
     /**
@@ -252,7 +277,7 @@ class BasePage {
      * @returns {Promise<void>}
      */
     async click(locator, context = this.page) {
-        await this._executeAction(locator, context, async (el) => {
+        await this._performAction(locator, context, async (el) => {
             try {
                 await el.click({ timeout: TIMEOUTS.MEDIUM });
             } catch {
@@ -261,25 +286,9 @@ class BasePage {
         }, { retries: 4, retryDelayMs: 500 });
     }
 
-    async _waitForOverlay(frame = this.page) {
-        const f = typeof frame === 'function' ? frame() : frame;
-        // En Bantotal puede existir un div vacío permanente; solo esperar si realmente se vuelve visible/bloqueante.
-        const overlay = f.locator('div:empty').first();
-        const appearanceTimeout = 1500;
-        const hiddenTimeout = Math.min(TIMEOUTS.UI_TRANSITION, 15000);
-        try {
-            await overlay.waitFor({ state: 'visible', timeout: appearanceTimeout });
-            await overlay.waitFor({ state: 'hidden', timeout: hiddenTimeout });
-        } catch {
-            // Si no aparece o no corresponde a un overlay transitorio, continuar.
-        }
-    }
-
     async _waitForProcessingMessage(frame = this.page, timeout = TIMEOUTS.PROCESSING_MAX) {
-        const ctx = typeof frame === 'function' ? frame() : frame;
-
+        const f = this._resolveContext(frame);
         const processingRegex = /procesando.*espere/i;
-
         const appearanceWindow = 2000;
         const pollInterval = 200;
         const endAt = Date.now() + appearanceWindow;
@@ -287,11 +296,9 @@ class BasePage {
         let appearedLocator = null;
 
         while (Date.now() < endAt && !appearedLocator) {
-            for (const f of this.page.frames()) {
-                const locator = f.getByText(processingRegex).first();
-
-                const isVisible = await locator.isVisible().catch(() => false);
-                if (isVisible) {
+            for (const frameCandidate of this.page.frames()) {
+                const locator = frameCandidate.getByText(processingRegex).first();
+                if (await locator.isVisible().catch(() => false)) {
                     appearedLocator = locator;
                     break;
                 }
@@ -307,43 +314,6 @@ class BasePage {
         try {
             await appearedLocator.waitFor({ state: 'hidden', timeout });
         } catch {
-            // Si no desaparece, no bloqueamos aquí
-        }
-    }
-
-    /**
-     * Espera y espera desaparición de mensaje de procesamiento.
-     * Maneja el ciclo completo: aparecer -> desaparecer con buffer UI.
-     * @param {Function|Frame|Page} [frame=this.page] - Contexto a esperar
-     * @param {number} [timeout=600000] - Timeout en ms
-     * @returns {Promise<void>}
-     */
-    async waitEndProcessingMessage(frame = this.page, timeout = 600000) {
-        const f = typeof frame === 'function' ? frame() : frame;
-        const loader = f.getByText(/procesando, por favor espere/i);
-
-        const appearanceWindow = 5000;
-        const pollInterval = 200;
-
-        let appeared = false;
-        const end = Date.now() + appearanceWindow;
-
-        // 1. Esperar a que aparezca
-        while (Date.now() < end) {
-            const visible = await loader.isVisible().catch(() => false);
-
-            if (visible) {
-            appeared = true;
-            break;
-            }
-
-            await this.page.waitForTimeout(pollInterval);
-        }
-
-        // 2. Si apareció, asegurar que desaparezca realmente
-        if (appeared) {
-            await loader.waitFor({ state: 'hidden', timeout }).catch(() => {});
-            await this.page.waitForTimeout(300);
         }
     }
 
@@ -356,38 +326,14 @@ class BasePage {
      * @returns {Promise<void>}
      */
     async waitForFrameStable(frame, options = {}) {
-        const timeout = options.timeout ?? TIMEOUTS.COMPONENT_LOAD;
         const processingTimeout = options.processingTimeout ?? TIMEOUTS.PROCESSING_MAX;
-        const f = typeof frame === 'function' ? frame() : frame;
+        const f = this._resolveContext(frame);
 
         await this._waitForProcessingMessage(f, processingTimeout);
     }
 
     /**
-     * Obtiene el valor actual de un campo de entrada.
-     * @param {Locator} locator - Campo de entrada
-     * @returns {Promise<string>} Valor del campo
-     * @throws {Error} Si elemento no es visible
-     */
-    async getInputValue(locator) {
-        await locator.waitFor({ state: 'visible' });
-        return await locator.inputValue();
-    }
-
-    /**
-     * Obtiene el contenido de texto de un elemento.
-     * @param {Locator} locator - Elemento a leer
-     * @returns {Promise<string>} Texto trimmed
-     * @throws {Error} Si elemento no es visible
-     */
-    async getText(locator) {
-        await locator.waitFor({ state: 'visible' });
-        return (await locator.textContent()).trim();
-    }
-
-    /**
      * Valida que todos los elementos en lista sean visibles.
-     * Aplicable a validaciones de precondiciones (ISTQB).
      * @param {Array<Locator>} [locators=[]] - Elementos a validar
      * @param {number} [timeout=6000000] - Timeout en ms
      * @throws {Error} Si algún elemento no es visible
@@ -397,52 +343,6 @@ class BasePage {
         for (const locator of locators) {
             await locator.waitFor({ state: 'visible', timeout });
         }
-    }
-
-    /**
-     * Helper de validación: Verifica visibilidad de elemento.
-     * @param {Locator} locator - Elemento a validar
-     * @param {Object} [options] - Opciones
-     * @throws {AssertionError} Si elemento no es visible
-     * @returns {Promise<void>}
-     */
-    async assertVisible(locator, options = {}) {
-        const timeout = options.timeout ?? TIMEOUTS.LONG;
-        await expect(locator).toBeVisible({ timeout });
-    }
-
-    /**
-     * Helper de validación: Verifica invisibilidad de elemento.
-     * @param {Locator} locator - Elemento a validar
-     * @param {Object} [options] - Opciones
-     * @throws {AssertionError} Si elemento es visible
-     * @returns {Promise<void>}
-     */
-    async assertHidden(locator, options = {}) {
-        const timeout = options.timeout ?? TIMEOUTS.LONG;
-        await expect(locator).toBeHidden({ timeout });
-    }
-
-    /**
-     * Helper de validación: Verifica igualdad de texto.
-     * @param {Locator} locator - Elemento a validar
-     * @param {string} expectedText - Texto esperado
-     * @throws {AssertionError} Si texto no coincide
-     * @returns {Promise<void>}
-     */
-    async assertTextEquals(locator, expectedText, options = {}) {
-        await expect(locator).toHaveText(expectedText, options);
-    }
-
-    /**
-     * Helper de validación: Verifica que elemento contenga texto.
-     * @param {Locator} locator - Elemento a validar
-     * @param {string} text - Texto a contener
-     * @throws {AssertionError} Si elemento no contiene texto
-     * @returns {Promise<void>}
-     */
-    async assertTextContains(locator, text) {
-        await expect(locator).toContainText(text);
     }
 }
 

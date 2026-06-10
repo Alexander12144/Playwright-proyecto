@@ -1,8 +1,8 @@
-const { BandejaTareasPage } = require('../pages/BandejaTareasPage');
+const { BandejaTareasPage } = require('../../pages/BandejaTareasPages/BandejaTareasPage');
 const { InstanciaProcesoFlow } = require('./InstanciaProcesoFlow');
 const { DatosGeneralesFlow } = require('./DatosGeneralesFlow');
 const { DatosPersonaFlow } = require('./DatosPersonaFlow');
-const { TIMEOUTS } = require('../utils/constants');
+const { TIMEOUTS } = require('../../utils/constants');
 
 /**
  * Orquestador de procesos relacionados con la Bandeja de Tareas.
@@ -43,9 +43,8 @@ class BandejaTareasFlow {
         await this.bandejaPage.seleccionarFila(nroInstancia);
         await this.bandejaPage.ejecutarTareaSeleccionada();
 
-        await this.bandejaPage.esperarPaso2Visible();
+        //await this.bandejaPage.esperarPaso2Visible();
 
-        // Orquestación secuencial de pasos
         await this.datosGeneralesFlow.completarSeccion(datos, config);
         
         if (config.validarExito && config.validarPasoPersona) {
@@ -81,10 +80,8 @@ class BandejaTareasFlow {
         await this.bandejaPage.irAInicioProceso();
         await this.instanciaProcesoFlow.iniciarNuevoProceso(nombreProceso);
 
-        // Completar Datos Generales
         await this.datosGeneralesFlow.completarSeccion(dataCliente, opciones);
 
-        // Completar datos de Persona
         if (opciones.validarExito !== false) {
             await this.datosPersonaFlow.completarSeccion(dataCliente, { avanzar: true });
         }

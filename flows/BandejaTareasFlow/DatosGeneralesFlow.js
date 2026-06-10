@@ -1,5 +1,5 @@
-const { DatosGeneralesPage } = require('../pages/DatosGeneralesPage');
-const { TIMEOUTS, FRAMES } = require('../utils/constants');
+const { DatosGeneralesPage } = require('../../pages/BandejaTareasPages/DatosGeneralesPage');
+const { TIMEOUTS, FRAMES } = require('../../utils/constants');
 
 /**
  * Orquestador para completar la sección de Datos Generales (STEP2).
@@ -35,7 +35,7 @@ class DatosGeneralesFlow {
 
         if (opciones.validarExito) {
             await this.datosPage.click(() => this.datosPage.linkSiguiente, this.datosPage.baseFrame);
-            const step3Frame = this.datosPage.page.frameLocator(FRAMES.BANDEJA_STEP3);
+            const step3Frame = this.datosPage.mainFrame.locator(FRAMES.BANDEJA_STEP3);
             await step3Frame.waitFor({ state: 'visible', timeout: TIMEOUTS.PROCESSING_MAX });
         } else {
             await this.datosPage.ejecutarValidacion();
@@ -54,7 +54,6 @@ class DatosGeneralesFlow {
     async _gestionarErrores(data) {
         const msg = this.datosPage.MENSAJES_ERROR;
         
-        // Mapeo de relación: Propiedad del objeto 'data' vs Propiedad del objeto 'MESSAGES'
         const camposObligatorios = {
             tipoPersona: msg.tipoPersona,
             tipoDoc: msg.tipoDoc,

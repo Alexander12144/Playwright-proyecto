@@ -28,6 +28,12 @@ const BASE_DATOS_PERSONA = Object.freeze({
     tipoAlta: 'Normal'
 });
 
+const DATOS_OPERACION_VEICULAR = Object.freeze({
+    cuenta: '172022',
+    operacion: '2235017',
+    estado: 'Aprobada'
+});
+
 function buildInstanciaExistente(overrides = {}) {
     const generalOverrides = overrides.datosGenerales ?? {};
     const personaOverrides = overrides.datosPersona ?? {};

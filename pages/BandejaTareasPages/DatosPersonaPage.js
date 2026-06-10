@@ -1,16 +1,17 @@
-const { BasePage } = require('./BasePage');
-const { TIMEOUTS, FRAMES } = require('../utils/constants');
-const { BantotalNavigator } = require('./components/BantotalNavigator');
+const { BasePage } = require('../BasePage');
+const { TIMEOUTS, FRAMES } = require('../../utils/constants');
+const { BantotalNavigator } = require('../components/BantotalNavigator');
 
 class DatosPersonaPage extends BasePage {
   constructor(page) {
     super(page);
     this.frameSelector = FRAMES.BANDEJA_STEP3;
+    this._activeBaseFrame = null;
     this._nav = null;
   }
 
   get baseFrame() {
-    return this.mainFrame.frameLocator(this.frameSelector);
+    return this._activeBaseFrame || this.mainFrame.frameLocator(this.frameSelector).last();
   }
 
   get nav() {
@@ -61,7 +62,7 @@ class DatosPersonaPage extends BasePage {
   get inputApellidoMaterno() { return this.baseFrame.locator('input[name="vPFAPE2"]'); }
   get inputPrimerNombre() { return this.baseFrame.locator('input[name="vPFNOM1"]'); }
   get inputSegundoNombre() { return this.baseFrame.locator('input[name="vPFNOM2"]'); }
-  get selectSexo() { return this.baseFrame.locator('#vPFCANT'); } // Renombrado de inputSexo a selectSexo para consistencia
+  get selectSexo() { return this.baseFrame.locator('#vPFCANT'); }
   get inputFechaNacimiento() { return this.baseFrame.locator('#vPFFNAC'); }
   get inputFechaVencimiento() { return this.baseFrame.locator('#vFCHVTODOC'); }
   get selectPaisNacimiento() { return this.baseFrame.locator('#vPFPNAC'); }
@@ -72,7 +73,7 @@ class DatosPersonaPage extends BasePage {
   get selectOcupacion() { return this.baseFrame.locator('#vPROFCOD'); }
   get selectNivelEstudios() { return this.baseFrame.locator('#vNINSCOD'); }
   get selectAutorizacion() { return this.baseFrame.locator('#vCMBCODAUX1'); }
-  get inputPep() { return this.baseFrame.getByRole('checkbox', { name: '_' }); } // More specific accessible name
+  get inputPep() { return this.baseFrame.getByRole('checkbox', { name: '_' }); }
   get selectFirmaContrato() { return this.baseFrame.locator('#vCMBCODAUX4'); }
   get selectPatrimonio() { return this.baseFrame.locator('#vCMBCODAUX5'); }
   get selectActividad() { return this.baseFrame.locator('#vCMBCODAUX6'); }
@@ -101,7 +102,7 @@ class DatosPersonaPage extends BasePage {
       this.inputApellidoMaterno,
       this.inputPrimerNombre,
       this.inputSegundoNombre,
-      this.selectSexo, // Corregido: usar selectSexo en lugar de inputSexo
+      this.selectSexo,
       this.inputFechaNacimiento,
       this.inputFechaVencimiento,
       this.selectPaisNacimiento,
@@ -120,6 +121,20 @@ class DatosPersonaPage extends BasePage {
   }
 
   async _ensurePageLoad() {
+    const timeout = TIMEOUTS.MEDIUM;
+    const candidateFrames = this.page.frames().filter(frame => /process.*_step/i.test(frame.name()));
+
+    for (const candidate of candidateFrames) {
+      try {
+        await this.waitForFrameStable(() => candidate);
+        const header = candidate.getByText('Instancia').first();
+        await expect(header).toBeVisible({ timeout });
+        this._activeBaseFrame = candidate;
+        return;
+      } catch {
+      }
+    }
+
     await this._ensurePageLoadForFrames(
       [FRAMES.BANDEJA_STEP1, FRAMES.BANDEJA_STEP2, FRAMES.BANDEJA_STEP3, FRAMES.BANDEJA_STEP4],
       [this.labelInstancia, this.inputApellidoPaterno],
@@ -139,7 +154,7 @@ class DatosPersonaPage extends BasePage {
       { key: 'apellidoMaterno', locator: () => this.inputApellidoMaterno, type: 'fill' },
       { key: 'primerNombre', locator: () => this.inputPrimerNombre, type: 'fill' },
       { key: 'segundoNombre', locator: () => this.inputSegundoNombre, type: 'fill' },
-      { key: 'sexo', locator: () => this.selectSexo, type: 'select' }, // Corregido: usar selectSexo en lugar de inputSexo
+      { key: 'sexo', locator: () => this.selectSexo, type: 'select' },
       { key: 'fechaNacimiento', locator: () => this.inputFechaNacimiento, type: 'fill' },
       { key: 'fechaVencimiento', locator: () => this.inputFechaVencimiento, type: 'fill' },
       { key: 'paisNacimiento', locator: () => this.selectPaisNacimiento, type: 'select' },
@@ -153,13 +168,10 @@ class DatosPersonaPage extends BasePage {
       { key: 'firmaContrato', locator: () => this.selectFirmaContrato, type: 'select' },
       { key: 'patrimonio', locator: () => this.selectPatrimonio, type: 'select' },
       { key: 'actividad', locator: () => this.selectActividad, type: 'select' },
-      //{ key: 'actividadObligado', locator: () => this.selectActividadObligado, type: 'select' },
-      // Note: Checkbox for PEP needs special handling if it's a toggle, or can be included if selectOption works.
     ];
 
     await this.fillForm(mapping, data, this.baseFrame);
 
-    // Special handling for checkbox if fillForm doesn't cover it directly
     if (data.pep !== undefined) {
       const isChecked = await this.inputPep.isChecked();
       if (data.pep && !isChecked) {

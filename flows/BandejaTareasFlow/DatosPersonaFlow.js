@@ -1,5 +1,5 @@
-const { DatosPersonaPage } = require('../pages/DatosPersonaPage');
-const { TIMEOUTS, FRAMES } = require('../utils/constants');
+const { DatosPersonaPage } = require('../../pages/BandejaTareasPages/DatosPersonaPage');
+const { TIMEOUTS, FRAMES } = require('../../utils/constants');
 
 /**
  * Orquestador para completar la sección de Datos de la Persona (STEP3).
@@ -35,7 +35,7 @@ class DatosPersonaFlow {
 
         if (opciones.avanzar) {
             await this.personaPage.click(() => this.personaPage.linkSiguiente, this.personaPage.baseFrame);
-            const step4Frame = this.personaPage.page.frameLocator(FRAMES.BANDEJA_STEP4);
+            const step4Frame = this.personaPage.page.frameLocator(FRAMES.BANDEJA_STEP4).last();
             await step4Frame.waitFor({ state: 'visible', timeout: TIMEOUTS.PROCESSING_MAX }).catch(() => {});
         }
     }

@@ -27,7 +27,10 @@ const FRAMES = {
     BANDEJA_STEP1: 'iframe[name="process1_step1"]',
     BANDEJA_STEP2: 'iframe[name="process1_step2"]',
     BANDEJA_STEP3: 'iframe[name="process1_step3"]',
-    BANDEJA_STEP4: 'iframe[name="process1_step4"]'
+    BANDEJA_STEP4: 'iframe[name="process1_step4"]',
+    // Helper para obtener el último frame de un step específico (el más reciente)
+    // Uso: page.frameLocator(getFrameSelector('step2'))
+    getFrameSelector: (stepNum) => `iframe[name^="process"][name$="_step${stepNum}"]`
 };
 
 // ========== MENSAJES ==========

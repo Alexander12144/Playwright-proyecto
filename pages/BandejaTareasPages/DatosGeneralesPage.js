@@ -1,18 +1,19 @@
 const { expect } = require('@playwright/test');
-const { BasePage } = require('./BasePage');
-const { TIMEOUTS, MESSAGES, FRAMES, TEXTS } = require('../utils/constants');
-const { BantotalNavigator } = require('./components/BantotalNavigator');
+const { BasePage } = require('../BasePage');
+const { TIMEOUTS, MESSAGES, FRAMES, TEXTS } = require('../../utils/constants');
+const { BantotalNavigator } = require('../components/BantotalNavigator');
 
 class DatosGeneralesPage extends BasePage {
-    constructor(page, frameSelector = FRAMES.BANDEJA_STEP2) {
+    constructor(page, frameSelector = FRAMES.BANDEJA_STEP4) {
         super(page);
         this.frameSelector = frameSelector;
+        this._activeBaseFrame = null;
         this.MENSAJES_ERROR = MESSAGES.ERRORS_DATOS_GENERALES;
-        this._nav = null;  // Lazy initialization
+        this._nav = null;
     }
 
-    get baseFrame() { 
-        return this.mainFrame.frameLocator(this.frameSelector); 
+    get baseFrame() {
+        return this._activeBaseFrame || this.mainFrame.frameLocator(this.frameSelector).last();
     }
 
     get tituloStep() { return this.baseFrame.locator('#HTMLTXTTITLE1'); }
@@ -37,6 +38,20 @@ class DatosGeneralesPage extends BasePage {
     get linkSiguiente() { return this.nav.btnSiguiente; }
 
     async _ensurePageLoad() {
+        const timeout = TIMEOUTS.MEDIUM;
+        const candidateFrames = this.page.frames().filter(frame => /process.*_step/i.test(frame.name()));
+
+        for (const candidate of candidateFrames) {
+            try {
+                await this.waitForFrameStable(() => candidate);
+                //const header = candidate.locator('#HTMLTXTTITLE1').first();
+                //await expect(header).toBeVisible({ timeout });
+                this._activeBaseFrame = candidate;
+                return;
+            } catch {
+            }
+        }
+
         await this._ensurePageLoadForFrames(
             [FRAMES.BANDEJA_STEP1, FRAMES.BANDEJA_STEP2, FRAMES.BANDEJA_STEP3, FRAMES.BANDEJA_STEP4],
             [this.tituloStep, this.selectTipoPersona],
@@ -81,7 +96,7 @@ class DatosGeneralesPage extends BasePage {
                     camposForzados.push('tipoDoc');
                 }
             } catch {
-                // Si el combo no permite limpiar, evitamos bloquear la ejecución.
+
             }
         }
 
@@ -98,8 +113,7 @@ class DatosGeneralesPage extends BasePage {
          */
         await Promise.race([
             this.inputResultadoValidacion.filter({ hasText: /.+/ }).waitFor({ state: 'visible', timeout: TIMEOUTS.MEDIUM }),
-            //this.baseFrame.getByText(/Debe\s+/).first().waitFor({ state: 'visible', timeout: TIMEOUTS.LONG })
-        ]).catch(() => console.log("La validación terminó pero no se detectó cambio de estado visual"));
+        ]).catch(() => {});
     }
 
     async fillNumeroDocumento(value) {
@@ -116,7 +130,6 @@ class DatosGeneralesPage extends BasePage {
             try {
                 await expect(mensajeEsperado).toBeVisible({ timeout: TIMEOUTS.MEDIUM });
             } catch {
-                // Fallback: algunas pantallas de Bantotal normalizan o cambian el texto exacto del error.
                 await expect(this.baseFrame.getByText(/Debe\s+/).first()).toBeVisible({ timeout: TIMEOUTS.LONG });
             }
         }

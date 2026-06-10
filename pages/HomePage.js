@@ -25,11 +25,11 @@ class HomePage extends BasePage {
 
     get logo() { return this.page.locator('#logo'); }
     get btnInicio() { return this.page.getByText('Inicio'); }
-    get btnAccesos() { return this.page.getByText('Accesos'); } // No hay constante aún
+    get btnAccesos() { return this.page.getByText('Accesos'); }
     get btnAtras() { return this.page.getByRole('link', { name: 'Atrás' }); }
     get btnAdelante() { return this.page.getByRole('link', { name: 'Adelante' }); }
     get btnRecargar() { return this.page.getByRole('listitem').filter({ hasText: 'Recargar' }); }
-    get btnImprimir() { return this.page.getByRole('listitem').filter({ hasText: 'Imprimir' }); } // No hay constante aún
+    get btnImprimir() { return this.page.getByRole('listitem').filter({ hasText: 'Imprimir' }); }
 
     get linkActividadUsuario() { 
         return this.frame1.getByRole('link', { name: 'Actividad del usuario' }); 
@@ -53,6 +53,7 @@ class HomePage extends BasePage {
      * Valida los elementos principales de la interfaz de usuario.
      */
     async validarUICompleta() {
+        await this.esperarCarga();
         await Promise.all([
             expect(this.logo).toBeVisible({ timeout: TIMEOUTS.MEDIUM }),
             expect(this.btnInicio).toBeVisible({ timeout: TIMEOUTS.MEDIUM }),

@@ -1,0 +1,1453 @@
+<html xmlns="http://www.w3.org/1999/xhtml"><head>
+	<meta name="generator" content="HTML Tidy for Windows (vers 14 February 2006), see www.w3.org">
+	<meta http-equiv="Content-Type" content="text/html; charset=us-ascii">
+	<title>DLYA : : Bantotal</title>
+	<script type="text/javascript" src="javascripts/infrastructure.js"></script>
+	<script language="JavaScript" type="text/javascript">
+		if (Infra.IsIe()){
+			self.location.assign("browserCompatibilityError.html");
+		}
+	</script>								  
+	<script type="text/javascript" src="javascripts/resources.js"></script>
+	<script type="text/javascript" src="javascripts/calculator.js"></script>
+	<link rel="stylesheet" type="text/css" href="calculadora.css">
+	<link rel="stylesheet" href="styles/container.css" type="text/css">
+	<link rel="stylesheet" href="styles/normalize.css" type="text/css">
+	<script type="text/javascript" src="jquery/jquery.js"></script>
+	<script type="text/javascript" src="jquery/jquery-ui.js"></script>
+	<script language="JavaScript" type="text/javascript">
+		$(function () {
+			//1/4/2015:Stephanie Pacheco: Utilizado para mover la calculadora
+			$("#dxy").draggable({ containment: "#body", scroll: false });
+		});
+	</script>
+
+	<script language="JavaScript" type="text/javascript">
+		//<![CDATA[
+		// Define lo referente al objeto "GlobalMonitor"
+		// Coleccio'n de elementos no repetidos
+
+		function GlobalMonitorCollection() {
+			this._elems = new Array();
+			this._size = 0;
+
+			this.Remove = function (elem) {
+				for (var i = 0; i < this._size; i++)
+					if (this._elems[i] == elem)
+						this._elems[i] = this._elems[--this._size];
+			};
+
+			this.Add = function (elem) {
+				for (var i = 0; i < this._size; i++)
+					if (this._elems[i] == elem)
+						return;
+
+				this._elems[this._size++] = elem;
+			};
+
+			this.Map = function (fun) {
+				for (var i = 0; i < this._size; i++)
+					fun(this._elems[i]);
+			};
+		}
+
+		var GlobalMonitor =
+		{
+			_registered: new GlobalMonitorCollection(),
+
+			// Operaciones pu'blicas
+			Trace: function (data) {
+				// Se notifica a todos los registrados del evento ocurrido
+				function notify(elem) {
+					if (elem.Notify)
+						elem.Notify(data);
+				}
+
+				this._registered.Map(notify);
+			},
+
+			Register: function (someone) {
+				this._registered.Add(someone);
+			},
+
+			Unregister: function (someone) {
+				this._registered.Remove(someone);
+			}
+		};
+	  //]]>
+	</script>
+	<script language="JavaScript" type="text/javascript">
+		//<![CDATA[
+		// Objeto "AlertManager" (privado de esta pa'gina)
+		// Esta funcio'n se llamaba directamente desde algu'n objeto Gx, por lo tanto se deja su delcaracio'n tal cual para mantener la compatibilidad,
+		// el resto de las funcionalidades de las alertas esta'n dentro del objeto "AlertManager"
+		function closeCurrentAlertIf(text, type, call, mark) {
+			AlertManager.CloseCurrentAlertIf(text, type, call, mark);
+		}
+
+		var AlertManager =
+		{
+			// Cuando hay una alerta abierta se siguen mandando "getAlerts" de forma de mantener la sesio'n activa y verificar los pedidos en ejecucio'n ("pinging")
+			// Este valor en true indica pedido efectivo de alertas y en false "pinging"
+			_stopPinging: true,
+
+			// Indica si se esta'n mandando "pings"
+			_pinging: false,
+
+			// Contador que lleva la cuenta de cua'ntas veces se entro' en estado de "pinging", se utiliza para eliminar "timers" viejos
+			_globalPingCount: 0,
+
+			// Contador que lleva cua'ntas invocaciones por alerta o "pinging" se hicieron
+			_globalServerRequestCount: 0,
+
+			// Vector con requerimientos en ejecucio'n
+			_currentRequests: new Array(),
+
+			// Vector con requerimientos recientes (permite comprobar si un pedido realmente se comenzo' a ejecutar en el servidor)
+			_recentRequests: new Array(),
+
+			// Identificadores de "popups" a remover
+			_toRmovePopupIds: "",
+
+			// En caso que el programa que consulta las alertas sea viejo se evita el control ejecucio'n de
+			// pedidos ya que no se dispondra' de la informacio'n necesaria
+			_avoidReqCheckCausedOldGetAlert: false,
+			_noRecentReqCausedOldGetAlert: false,
+
+			// s de programas de manejo de alertasURL
+			_getAlertUrl: null,
+			_removeAlertUrl: null,
+
+			// Datos de la alerta abierta
+			_alertCall: null,
+			_alertType: null,
+			_alertMark: null,
+
+			// Elementos del DOM
+			_messageBack: null,
+			_messageBody: null,
+			_messageText: null,
+			_messageTitle: null,
+			_messageLink: null,
+
+			_AlertArrived: function (text, call, type, mark) {
+				// Se invoca al recibir una alerta con los datos obtenidos desde el servidor
+
+				// Se recuerda para cerrar la alerta actual de forma condicional (closeCurrentAlertIf)
+				this._alertType = type;
+
+				if ((type == 'C') || (type == 'c')) {
+					this._alertCall = call;
+					this._alertMark = null;
+
+					this._messageText.innerText = text == "" ? Resources.GetConfirmationPendingDefaultText() : text;
+					this._messageTitle.innerText = Resources.GetAlertAreaTitleText();
+					this._messageLink.style.display = "inline";
+				}
+				else if ((type == 'M') || (type == 'm')) {
+					// En caso que el paso actualmente visible sea el de esta marca no se mostrara' la alerta
+					if (ProcessManager.GetCurrentMark() == mark) {
+						this.CloseAlert();
+						return;
+					}
+
+					this._alertCall = call;
+					this._alertMark = mark;
+
+					this._messageText.innerText = text == "" ? Resources.GetMarkedMessageDefaultText() : text;
+					this._messageTitle.innerText = Resources.GetAlertAreaTitleText();
+					this._messageLink.style.display = "inline";
+				}
+				else {
+					this._alertCall = null;
+					this._alertMark = null;
+
+					this._messageText.innerText = text;
+					this._messageTitle.innerText = Resources.GetAlertAreaMessageTitleText();
+					this._messageLink.style.display = "none";
+				}
+
+				// Se comienza a hacer "pings" para mantener la sesio'n
+				this._ProcessAlerts(true);
+
+				// Se define un fondo con las mismas dimensiones que el mensaje
+				this._messageBack.style.width = this._messageBody.clientWidth;
+				this._messageBack.style.height = this._messageBody.clientHeight;
+				//this._messageBack.style.right = this._messageBody.style.right = 18;
+				this._messageBack.style.right = this._messageBody.style.right;
+
+				// Se hace visible la alerta mediante una animacio'n
+				//var bottom = 28 - this._messageBody.clientHeight;
+				var bottom = 48 - this._messageBody.clientHeight;
+				this._messageBack.style.bottom = this._messageBody.style.bottom = bottom;
+				this._messageBack.style.visibility = this._messageBody.style.visibility = "visible";
+
+				var thisObject = this;
+				var animateAlert = function () {
+					bottom += 5;
+					//if (bottom < 28) // cuando la parte inferior llega a 28px se para
+					if (bottom < 48) {
+						// Se continu'a la animacio'n
+						thisObject._messageBack.style.bottom = thisObject._messageBody.style.bottom = bottom;
+						setTimeout(animateAlert, 25);
+					}
+					else {
+						// Fin de la animacio'n
+						//thisObject._messageBack.style.bottom = thisObject._messageBody.style.bottom = 28;
+						thisObject._messageBack.style.bottom = thisObject._messageBody.style.bottom = 48;
+					}
+				}
+				setTimeout(animateAlert, 1);
+			},
+
+			_SetExecutingReqs: function (reqs) {
+				if (reqs != null)
+					this._currentRequests = reqs.nodeValue.split(';');
+				else
+					this._currentRequests.length = 0;
+			},
+
+			_SetRecentExecutingReqs: function (reqs) {
+				if (reqs != null)
+					this._recentRequests = reqs.nodeValue.split(';');
+				else
+					this._recentRequests.length = 0;
+			},
+
+			//AVAZQUEZ 06/2015 -  Print con Aspose                                           
+			_CallPrinter: function (prnt, path, fnam, ncpy) {
+				if (path != "")
+					Infra.Print(prnt, path, fnam, ncpy);
+			},
+
+			_ProcessAlerts: function (forPinging) {
+				// Funcio'n que se encarga del pedido constante de alertas
+				// 'forPinging' en true indica que hay una alerta abierta y por lo tanto se llama al programa de alertas
+				// so'lo para mantener la sesio'n activa y verificar los pedidos que esta'n en ejecucio'n.
+
+				AlertManager._pinging = forPinging;
+				var req, pollingTimeout;
+				var timeout = 10000;
+				var localPingCount = 0;
+
+				// Si hay una alerta abierta
+				if (forPinging) {
+					// Con esto se evita que haya ma's de un "timer" para hacer "pings"
+					localPingCount = ++(this._globalPingCount);
+					this._stopPinging = false;
+				}
+				else
+					this._stopPinging = true;
+
+				var handler = function onreadystatechangeHandler() {
+					var elem, id, text, call, type, mark;
+					var prnt, path, fnam, ncpy;
+
+					if (req.readyState == 4) {
+						if (req.responseXML != null) {
+							// Se definen los requerimientos en ejecucio'n
+							if (req.status == 200) {
+								// Esto se utiliza para comprobar que se haya logrado ir al servidor al menos 3 veces antes de reportar que un pedido
+								// no esta' ma's en ejecucio'n
+								AlertManager._globalServerRequestCount++;
+
+								if (req.responseXML.getElementsByTagName("reqs").length > 0) {
+									AlertManager._avoidReqCheckCausedOldGetAlert = false;
+									AlertManager._SetExecutingReqs(req.responseXML.getElementsByTagName("reqs")[0].firstChild);
+
+									if (req.responseXML.getElementsByTagName("recent-reqs").length > 0) {
+										AlertManager._SetRecentExecutingReqs(req.responseXML.getElementsByTagName("recent-reqs")[0].firstChild);
+										AlertManager._noRecentReqCausedOldGetAlert = false;
+									}
+									else {
+										// No hay elemento "recent-reqs", el programa que consulta las alertas es viejo
+										AlertManager._noRecentReqCausedOldGetAlert = true;
+									}
+								}
+								else {
+									// No hay elemento "reqs", el programa que consulta las alertas es viejo
+									AlertManager._avoidReqCheckCausedOldGetAlert = true;
+								}
+							}
+
+							// Si se indica que se deje de hacer "pings" no se define el "timer"
+							if (AlertManager._pinging) {
+								// Si se indico' alguna realizacio'n de "pings" luego de esta, se aborta esta
+								if (!AlertManager._stopPinging && (localPingCount == AlertManager._globalPingCount))
+									pollingTimeout = setTimeout(gAlert, timeout);
+
+								return;
+							}
+
+							if (req.status == 200) {
+								// Control para evitar atender respuestas vaci'as
+								if (req.responseXML.getElementsByTagName("type").length > 0) {
+									elem = req.responseXML.getElementsByTagName("type")[0].firstChild;
+									type = elem != null ? elem.nodeValue : "";
+									elem = req.responseXML.getElementsByTagName("id")[0].firstChild;
+									id = elem != null ? elem.nodeValue : "";
+
+									//alert(type + "..."+ lfp);
+									// Se genera la alerta
+									if (type != "P") {
+										// Se consiguen los datos de la alerta
+										elem = req.responseXML.getElementsByTagName("text")[0].firstChild;
+										text = elem != null ? elem.nodeValue : "";
+										elem = req.responseXML.getElementsByTagName("call")[0].firstChild;
+										call = elem != null ? elem.nodeValue : "";
+										elem = req.responseXML.getElementsByTagName("mark")[0].firstChild;
+										mark = elem != null ? elem.nodeValue : "";
+
+										rAlert(id);
+										AlertManager._AlertArrived(text, call, type, mark);
+									}
+									else {
+										/* AV - 01/06/2015 - Req. de Impresion   */
+										if (type = "P") {
+											elem = req.responseXML.getElementsByTagName("prn-list")[0];
+											if (elem != null) {
+												var cn = elem.childNodes;
+												for (var i = 0; i < cn.length; i++) {
+													if (cn[i].nodeType == 1) {
+														path = fnam = ncpy = prnt = "";
+
+														for (var j = 0; j < cn[i].childNodes.length; j++) {
+															elem = cn[i].childNodes[j];
+															var localName = elem.nodeName;
+
+															if (localName == "prnt") {
+																prnt = elem.firstChild != null ? elem.firstChild.nodeValue : "";
+															}
+															else if (localName == "path") {
+																path = elem.firstChild != null ? elem.firstChild.nodeValue : "";
+															}
+															else if (localName == "fnam") {
+																fnam = elem.firstChild != null ? elem.firstChild.nodeValue : "";
+															}
+															else if (localName == "ncpy") {
+																ncpy = elem.firstChild != null ? elem.firstChild.nodeValue : "";
+															}
+														}
+
+														AlertManager._CallPrinter(prnt, path, fnam, ncpy);
+													}
+												}
+											}
+										}
+
+										rAlert(id);
+										pollingTimeout = setTimeout(gAlert, timeout);
+									}
+								}
+								else
+									pollingTimeout = setTimeout(gAlert, timeout);
+							}
+							else
+								pollingTimeout = setTimeout(gAlert, timeout);
+						}
+					}
+				}
+
+				var gAlert = function getAlert() {
+					// Si se dejo' de enviar "pings" se termina la ejecucio'n
+					if (AlertManager._pinging && (AlertManager._stopPinging || (localPingCount < AlertManager._globalPingCount)))
+						return;
+
+					req.abort();
+					req.onreadystatechange = handler;
+
+					try {
+						// Se envi'an los identificadores de "popups" a remover
+						req.open("POST", AlertManager._getAlertUrl + ',' + AlertManager._toRmovePopupIds + (AlertManager._pinging ? ',1' : ',0'), true);
+					}
+					catch (e) {
+						// Puede dar un acceso denegado si viene un puerto equivocado (sucede con un balanceador en algunos casos
+						// que no le quita el puerto a la respuesta y la URL base difiere de la que se esta' mandando aqui')
+						AlertManager._getAlertUrl = Infra.FixUrl(AlertManager._getAlertUrl);
+						req.open("POST", AlertManager._getAlertUrl + ',' + AlertManager._toRmovePopupIds + (AlertManager._pinging ? ',1' : ',0'), true);
+					}
+
+					AlertManager._toRmovePopupIds = "";
+					req.send("");
+				}
+
+				var rAlert = function removeAlert(id) {
+					req.abort();
+
+					// No se setea una funcio'n que atienda la respuesta porque no se necesita procesar la misma
+					try {
+						req.open("GET", AlertManager._removeAlertUrl + "?" + id, true);
+					}
+					catch (e) {
+						// Puede dar un acceso denegado si viene un puerto equivocado (sucede con un balanceador en algunos casos
+						// que no le quita el puerto a la respuesta y la URL base difiere de la que se esta' mandando aqui')
+						AlertManager._removeAlertUrl = Infra.FixUrl(AlertManager._removeAlertUrl);
+						req.open("GET", AlertManager._removeAlertUrl + "?" + id, true);
+					}
+
+					req.send("");
+				}
+
+				if (window.XMLHttpRequest) {
+					req = new XMLHttpRequest();
+					req.onreadystatechange = handler;
+				}
+				else {
+					if (window.ActiveXObject) {
+						// Internet Explorer
+						req = new ActiveXObject("Microsoft.XMLHTTP");
+						req.onreadystatechange = handler;
+					}
+				}
+
+				// Se busca por primera vez la alerta
+				gAlert();
+			},
+
+			// Operaciones pu'blicas
+
+			OpenAlert: function () {
+				if ((this._alertMark == null) || (!ProcessManager.TryGoToMark(this._alertMark)))
+					ProcessManager.StartNew(this._alertCall, Resources.GetAlertAreaTitleText());
+
+				this._messageBody.style.visibility = "hidden";
+				this._messageBack.style.visibility = "hidden";
+				this._ProcessAlerts(false);
+			},
+
+			CloseAlert: function () {
+				this._messageBody.style.visibility = "hidden";
+				this._messageBack.style.visibility = "hidden";
+				this._ProcessAlerts(false);
+			},
+
+			CloseCurrentAlertIf: function (text, type, call, mark) {
+				// Permite cerrar la alerta actual (si la hay) segu'n algunos criterios. Si alguno de los para'metros es null no se toma en cuenta.
+
+				// Si no hay alerta visible no se hace nada
+				if (this._messageBody.style.display == "none")
+					return;
+
+				if ((type != null) && (type != this._alertType))
+					return;
+
+				if ((text != null) && (text != this._messageText.innerText))
+					return;
+
+				if ((call != null) && (call != this._alertCall))
+					return;
+
+				if ((mark != null) && (mark != this._alertMark))
+					return;
+
+				AlertManager.CloseAlert();
+			},
+
+			ExecutionHasEnded: function (reqId) {
+				// Indica si el identificador dado esta' en ejecucio'n en el servidor actualmente
+
+				if (this._avoidReqCheckCausedOldGetAlert)
+					return false;
+
+				for (var i = 0; i < this._currentRequests.length; i++)
+					if (reqId == this._currentRequests[i])
+						return false;
+
+				return true;
+			},
+
+			ExecutionHasStarted: function (reqId) {
+				// Indica si el requerimiento dado se llego' a ejecutar en el servidor
+
+				if (this._noRecentReqCausedOldGetAlert)
+					return true;
+
+				for (var i = 0; i < this._recentRequests.length; i++)
+					if (reqId == this._recentRequests[i])
+						return true;
+
+				return false;
+			},
+
+			GetServerRequestCount: function () {
+				return this._globalServerRequestCount;
+			},
+
+			ClearPopup: function (popupId) {
+				if (this._toRmovePopupIds != "")
+					this._toRmovePopupIds += ";" + popupId;
+				else
+					this._toRmovePopupIds = popupId;
+			},
+
+			Initialize: function (getAlertUrl, removeAlertUrl) {
+				this._messageBack = document.getElementById("messageBack");
+				this._messageBody = document.getElementById("messageBody");
+				this._messageText = document.getElementById("messageText");
+				this._messageTitle = document.getElementById("messageTitle");
+				this._messageLink = document.getElementById("messageLink");
+
+				// Se define el texto del "link" del mensaje de alerta
+				this._messageLink.innerText = Resources.GetAlertLinkText();
+
+				this._getAlertUrl = getAlertUrl;
+				this._removeAlertUrl = removeAlertUrl;
+
+				this._ProcessAlerts(false);
+			}
+		};
+	  //]]>
+	</script>
+	<script language="JavaScript" type="text/javascript">
+		//<![CDATA[
+		// Objeto "Environment"
+		var Environment = {};
+		//]]>
+	</script>
+	<script language="JavaScript" type="text/javascript">
+		//<![CDATA[
+		// Define lo referente al manejo de teclado
+		var KeyboardManager =
+		{
+			_Dispatch: function (actionExecutor, action) {
+				if (actionExecutor)
+					actionExecutor(action);
+				else
+					action();
+			},
+
+			_KeydownHandler: function (e, actionExecutor, fromChild /* = false */) {
+				// 'e' -> evento en caso que se haya despachado expli'citamente desde el padre o un hijo.
+				// 'actionExecutor' -> es una funcio'n que recibira' la accio'n concreta a realizar como par'ametro y permite al manejador (so'lo si es del manejador hijo)
+				//                     que haya delegado la ejecucio'n aqui' hacer algo antes de que se realice lo que el usuario tecleo'
+				// 'fromChild' -> true indica que el evento se genero' en un manejador hijo, y false que se genero' en esta propia pantalla (o viene bajando desde el padre) lo cual
+				//                implica que primero se intente despachar el manejador en el hijo en caso que exista (este a su vez, si no puede manejar el evento volvera' aqui' 
+				//                con fromChild == true mediante la operacio'n pu'blica ProcesssEventFromChild)
+
+				if (arguments.length <= 2)
+					fromChild = false;
+
+				if (!e)
+					e = window.event;
+
+				if (KeyboardManager != this)
+					return KeyboardManager._KeydownHandler(e, actionExecutor, fromChild);
+
+				// Si corresponde se intenta despachar el evento en el paso hijo actual
+				if (!fromChild && ProcessManager.KeyEventOnCurrent(e, "DOWN", null))
+					return false;
+
+				var code = e.keyCode;
+				//06/04/2015:Stephanie Pacheco: ALT + C
+				if (e.altKey) {
+					if (code == 67) {
+
+						var action = function () {
+							if (_Calculator.CheckFirstExecution()) //-GL - 26/09/2019 - Se agrega para cargar el log de caculos del dÃ­a unicamente la primera vez que ejecuta la calculadora.
+							{
+								setTimeout(function () {
+									_Calculator.getLog();
+								}, 50);
+							}
+							_Calculator.openCalc();
+							Infra.CancelEvent(e, true)
+							return false;
+						}
+						this._Dispatch(actionExecutor, action);
+					}
+				}
+
+
+				if (e.altLeft)
+					return;
+
+				if (e.ctrlKey && !e.altKey) // Se evita bloquear el altGr = alt + ctrl
+				{
+					// Se manejan las acciones que requieren cambiar la pantalla actual, y eso implica validar el campo activo en caso de existir
+					if ((code == 78) || (code == 115) || (code == 33) || (code == 34)) {
+						var action = function () {
+							if (code == 78) {
+								// Ctrl-N -> "open workspace"
+								TopPageManager.OpenWorkSpace();
+							}
+							else if (code == 115) {
+								// Ctrl-F4 -> "close WorkSpace"
+								TopPageManager.CloseWorkSpace(true);
+							}
+							else if (code == 33) {
+								// Ctrl-PgUp -> "previous process"
+								ProcessManager.PrevProcess();
+							}
+							else if (code == 34) {
+								// Ctrl-PgDn -> "next process"
+								ProcessManager.NextProcess();
+							}
+						}
+
+						this._Dispatch(actionExecutor, action);
+
+						if (code == 115)
+							Infra.CancelEvent(e, true);
+					}
+					else if ((e.keyCode == 79) || (e.keyCode == 70) || (e.keyCode == 76) || (e.keyCode == 87) || (e.keyCode == 9)) {
+						// Se bloquea Ctrl-F (por accesos directos), Ctrl-O, Ctrl-L, Ctrl-W o Ctrol-Tab que necesitan tratamiento especial
+						Infra.CancelEvent(e, true);
+					}
+
+					if (((e.keyCode < 35) || (e.keyCode > 40)) && (e.keyCode != 45) && (e.keyCode != 88) &&
+						(e.keyCode != 86) && (e.keyCode != 67) && (e.keyCode != 65) && (e.keyCode != 90) && (e.keyCode != 89) && (e.keyCode != 8)) {
+						// Se bloquea el resto de las combinaciones con Ctrl que no necesitan tratamiento especial
+						// Solo se permite el copiado ('c'), cortado ('x') y pegado ('v') al portapapeles; seleccionar todo ('a');
+						// deshacer ('z'); y rehacer ('y'); y borrar palabra ('back')
+						return Infra.CancelEvent(e, false);
+					}
+				}
+				else if (!e.shiftKey && ((e.keyCode == 113) || (e.keyCode == 114) || ((e.keyCode >= 117) && (e.keyCode <= 122)))) {
+					var action = function () {
+						if (code == 113) {
+							// F2 -> "open workspace"
+							TopPageManager.OpenWorkSpace();
+						}
+						else if (code == 114) {
+							// F3 -> "close WorkSpace"
+							TopPageManager.CloseWorkSpace(true);
+						}
+						else if ((code >= 117) && (code <= 122)) {
+							// Del F6 al F11 son posibles accesso directos del menu'
+							TopPageManager.HandleMenuShortcut(code);
+						}
+					}
+
+					this._Dispatch(actionExecutor, action);
+
+					return Infra.CancelEvent(e, true);
+				}
+				else if (e.shiftKey && ((e.keyCode >= 113) && (e.keyCode <= 123))) {
+					var action = function () {
+						// Se le suma 10 que es el "offset" de teclas de funcio'n no utilizadas
+						// sin Shift y el F1 que no se puede utilizar de ninguna forma al no poder bloquearse
+						TopPageManager.HandleMenuShortcut(code + 10);
+					}
+
+					this._Dispatch(actionExecutor, action);
+
+					// Shift + F2 al F12 (ma's accesos del menu')
+					// Se bloquea el F11 y el F6
+					return Infra.CancelEvent(e, true);
+				}
+				else if (e.keyCode == 8) {
+					// Se bloquea el 'back'
+					return Infra.CancelEvent(e, true);
+				}
+
+				// Se bloquean las flechas de arriba y abajo porque estando el foco en las barras superiores en MOZ se puede desplazar toda la pantalla hacia arriba
+				if (!e.ctrlKey && !e.altKey && !e.altKey && ((e.keyCode == 38) || (e.keyCode == 40)))
+					Infra.CancelEvent(e, false);
+
+				return false;
+			},
+
+			// Operaciones pu'blicas:        
+			Initialize: function () {
+				if (Infra.IsIe())
+					document.body.attachEvent("onkeydown", this._KeydownHandler);
+				else
+					document.attachEvent("onkeydown", this._KeydownHandler);
+			},
+
+			ProcessEventFromChild: function (e, type, actionExecutor) {
+				if (type == "DOWN") {
+					this._KeydownHandler(e, actionExecutor, true);
+					return true;
+				}
+
+				return false;
+			}
+		};
+		//]]>
+	</script>
+	<script language="JavaScript" type="text/javascript">
+		//<![CDATA[
+		// Objeto "TopPageManager" (este objeto es la pu'blico para el resto del ambiente)
+		// Esta funcio'n se llamaba directamente desde algu'n objeto Gx, por lo tanto se deja su delcaracio'n tal cual para mantener la compatibilidad
+		function attachUnload(handler) {
+			TopPageManager.AttachUnload(handler);
+		}
+
+		var TopPageManager =
+		{
+			// Manejo del menu'
+
+			_menuShorcutLinkArray: new Array(17), // Vector con accesos directos del menu'
+
+			_AttachMenuKey: function (key, link, title, type) {
+				// 'key' es el nu'mero de la tecla de funcio'n, por ejemplo F6 se corresponde con 6
+
+				if ((key < 6) && (key > 11))
+					return;
+
+				TopPageManager._menuShorcutLinkArray[key - 6] = [link, title, type];
+			},
+
+			HandleMenuShortcut: function (key) {
+				// 'key' es el co'digo de la tecla presionada
+				// Los accesos directos del menu' van entre F6 (co'digo 116) y F11 (co'digo 121)
+				if ((key < 117) && (key > 133))
+					return;
+
+				var urlInfo = this._menuShorcutLinkArray[key - 117];
+
+				if (urlInfo != null) {
+					// En caso que sea el programa de informacio'n, o que el espacio de trabajo actual este' vaci'o se
+					// consulta para asegurarse de no cerrar sin intencio'n el espacio de trabajo actual
+					if ((urlInfo[2] != 'I') && !ProcessManager.CurrentIsEmpty()) {
+						if (!confirm("Si abre el nuevo programa se perder\u00E1 la informaci\u00F3n del espacio de trabajo actual."))
+							return;
+					}
+
+					this.ProcessMenuEntrance(urlInfo[0], urlInfo[1], urlInfo[2]);
+				}
+			},
+
+			ProcessMenuEntrance: function (url, title, type) {
+				var pgmName;
+
+				// Se valida que no se haya abierto otra sesio'n
+				if (!this.CheckBeforeSubmit(false))
+					return;
+
+				// Se comprueba si es una llamada
+				if (type == 'I') {
+					var width = 552;
+					var height = 274;
+					var l = (screen.availWidth - width) / 2;
+					var t = (screen.availHeight - height) / 2;
+
+					pgmName = ProcessManager.GetCurrentProgram();
+
+					if (pgmName != "") {
+						url = url + "," + pgmName;
+						window.open(url, "_blank", "status=no,toolbar=no,location=no,directories=no,menubar=no,width=" + width + ",height=" + height + ",left=" + l + ",top=" + t + ",scrollbars=no,resizable=yes,copyhistory=no");
+					}
+				}
+				else {
+					ProcessManager.ResetCurrent(url, title);
+				}
+			},
+
+			GetElements: function (tagName) {
+				return ProcessManager.GetElements(tagName);
+			},
+
+			GetScroll: function () {
+				return ProcessManager.GetScroll();
+			},
+
+			IsExternal: function () {
+				// Se realiza este control porque si el usuario podri'a llegar a provocar esto antes que se
+				// inicialice el manejador de procesos
+				return ProcessManager.CurrentIsExternal();
+			},
+
+			// Chequeos de compatibilidad:
+
+			_compatibilityProblemAlreadyNotified: false,
+			_compatibilityProblemExists: null,
+
+			_GetReaderVersion: function () {
+				var pdfTest = document.getElementById("pdfTest");
+				var versionDataArray = pdfTest.GetVersions().split(",");
+
+				for (var x = 0; x < versionDataArray.length; x++) {
+					var tmpArray = versionDataArray[x].split("=");
+
+					// El segundo elemento del vector es la versio'n del "plugin"
+					var pluginVersion = tmpArray[1];
+
+					// Hay valores en blanco y no definidas
+					if (typeof (pluginVersion) != "undefined")
+						return pluginVersion.substring(0, 1);
+				}
+
+				return 5;
+			},
+
+			_GetIEVersion: function () {
+				return /*@cc_onfunction () { switch (@_jscript_version) { case 1.0: return 3; case 3.0: return 4; case 5.0: return 5; case 5.1: return 5; case 5.5: return 5.5; case 5.6: return 6; case 5.7: return 7; } } () || @*/0;
+			},
+
+			// Problema con el Reader 7 y el IE 6
+			HasPdfCompatibilityProblem: function () {
+				// Si ya se notifico' no se vuelve a tener en cuenta el problema de compatibilidad
+				if (this._compatibilityProblemAlreadyNotified)
+					return false;
+
+				if (this._compatibilityProblemExists != null)
+					return this._compatibilityProblemExists;
+
+				if (!Infra.IsIe())
+					return false;
+
+				if (this._compatibilityProblemExists == null) {
+					this._compatibilityProblemExists = true;
+
+					// Se calcula so'lo la primera vez
+					var browserVer = this._GetIEVersion();
+					if ((browserVer == 0) || (browserVer >= 7))
+						this._compatibilityProblemExists = false;
+					else {
+						var readerVer = this._GetReaderVersion();
+						if (readerVer >= 8)
+							this._compatibilityProblemExists = false;
+					}
+				}
+
+				return this._compatibilityProblemExists;
+			},
+
+			NotifyPdfCompatibilityProblem: function () {
+				// Esta notificacio'n se hace una u'nica vez
+				if (!this._compatibilityProblemAlreadyNotified)
+					alert(Resources.GetPdfIncompatibilityText());
+
+				this._compatibilityProblemAlreadyNotified = true;
+			},
+
+			// Control de requerimientos en ejecuci'on:
+
+			_lastReqId: 0, // Identificador global de pedidos
+
+			GetNextReqId: function () {
+				// Devuelve un autoenumerado u'nico de forma de que siempre los identificadores de requerimientos no se repitan ya que se se almacenan los u'ltimos que 
+				// se estuvieron ejecutando en el servidor y si se llegaran a repetir se podri'a pensar que un requerimiento fue reciente cuando en realidad no lo fue.
+
+				return this._lastReqId++;
+			},
+
+			ExecutionHasEnded: function (reqId) {
+				return AlertManager.ExecutionHasEnded(reqId);
+			},
+
+			ExecutionHasStarted: function (reqId) {
+				return AlertManager.ExecutionHasStarted(reqId);
+			},
+
+			GetServerRequestCount: function () {
+				return AlertManager.GetServerRequestCount();
+			},
+
+			// Propiedades del "opener":
+
+			_getStepUrl: null,
+			_getErrorMsgUrl: null,
+			_delSessionUrl: null,
+			_maximumWS: null,
+			_numberSeps: null,
+			_flashCodeBase: null,
+			_getAlertUrl: null,
+			_removeAlertUrl: null,
+			_infoPanelIsEnable: true,
+			_loadInfoUrl: null,			
+			_initialProcessName: null,
+			_initialProcessUrl: null,
+			_userName: null,
+			_systemDate: null,
+
+			infoPanelIsEnable: function() {
+				return this._infoPanelIsEnable;
+			},
+
+			setInfoPanelEnable: function(bool) {
+				this._infoPanelIsEnable = bool;
+			},
+
+			loadInfoUrl: function() {
+				return this._loadInfoUrl;
+			},
+			GetGetStepUrl: function () {
+				return this._getStepUrl;
+			},
+
+			GetGetErrorMessageUrl: function () {
+				return this._getErrorMsgUrl;
+			},
+
+			GetDecimalSep: function () {
+				return this._numberSeps[1];
+			},
+
+			GetThousandSep: function () {
+				return this._numberSeps[0];
+			},
+
+			GetFlashCodeBase: function () {
+				return this._flashCodeBase;
+			},
+
+			// Manejadores:
+
+			_LoadHandler: function () {
+				if (this != TopPageManager)
+					return TopPageManager._LoadHandler();
+
+				// Se inicializa el manejador de procesos y su proceso inicial
+				ProcessManager.Initialize(this._procContainer, TabManager);
+
+				if (TopPageManager._initialProcessUrl != "") {
+					ProcessManager.StartNew(TopPageManager._initialProcessUrl, TopPageManager._initialProcessName);
+				}
+				else {
+					ProcessManager.StartNew();
+				}
+
+				// Se quita el cartel de espera inicial
+				document.body.removeChild(document.getElementById("initialCover"));
+
+				// No se puede modificar el prototipo del objeto WINDOW, por eso se hace esta diferencia expli'citamente ya que "attachEvent" es IE
+				if (Infra.IsIe())
+					self.attachEvent("onunload", this._WinUnloadHandler);
+				else
+					self.onunload = this._WinUnloadHandler;
+
+				try {
+					opener.stopTimer();
+					if (opener.detachEvent)
+						opener.detachEvent('onunload', opener.winUnload);
+					else if (opener.detachEventListener)
+						opener.detachEventListener('unload', opener.winUnload, true);
+					else if (opener.removeEventListener)
+						opener.removeEventListener('unload', opener.winUnload, true);
+
+					// AV: en algunos casos no se ejecutabaeste handler en chrome, se fuerza el llamado
+					if (!Infra.IsIe())
+						this._ResizeHandler();
+				}
+				catch (e) { }
+
+				// Se inicializa el pedido de alertas
+				AlertManager.Initialize(TopPageManager._getAlertUrl, TopPageManager._removeAlertUrl);
+			},
+
+			_LoadHandlerForIE: function () {
+				if (this != TopPageManager)
+					return TopPageManager._LoadHandlerForIE();
+
+				// Se invoca el manejador normal
+				this._LoadHandler();
+
+				this._ResizeHandler();
+			},
+
+			_ResizeHandler: function () {
+				if (this != TopPageManager)
+					return TopPageManager._ResizeHandler();
+
+				var height = TopPageManager.GetClientAreaHeight();
+
+				if (height > 0) {
+					TopPageManager._procContainer.style.height = height + "px";
+
+					// En MOZ los IFRAMEs que tienen "position: absolute" y no tienen una altura fija en pi'xeles definida (no sirve "height: 100%") no llegan nunca
+					// a mostrar la barra de "scroll" horizontal; como los IFRAMEs que representan los procesos tienen esas caracteri'sticas, se le notifica al manejador
+					// de procesos que debe actualizar la altura del proceso actual al haber cambiado el taman~o de la pantalla, y, adicionalmente, cada vez que e'l haga visible
+					// un proceso le va a redefinir su altura (acorde a la del "_container") por si la misma cambio'
+					// En IE un "resize" del mouse que cambie solamente la altura no provoca la ejecucio'n del "resize" del evento de "processIndex.html", por lo tanto
+					// tambie'n se propaga
+					ProcessManager.ResizeEvent();
+				}
+			},
+
+			_WinUnloadHandler: function () {
+				if (this != TopPageManager)
+					return TopPageManager._WinUnloadHandler();
+
+				if (this._unloadEventHandlers != null) {
+					for (var i = 0; i < this._unloadEventHandlers.length; i++) {
+						try {
+							if (typeof (this._unloadEventHandlers[i]) == "function")
+								this._unloadEventHandlers[i]();
+							else
+								eval(this._unloadEventHandlers[i]);
+
+						}
+						catch (e) { }
+					}
+				}
+
+				// En caso que se haya abierto otra instancia se evita eliminar la autenticacio'n de forma de no cancelar la otra sesio'n
+				if (this._IsSameInstanceId()) {
+
+					if (this._delSessionUrl != "") {
+
+						// Se elimina la informacio'n de sesio'n
+						if ("sendBeacon" in navigator) {
+							try {
+								navigator.sendBeacon(this._delSessionUrl, "");
+							}
+							catch (e) {
+								// Puede dar un acceso denegado si viene un puerto equivocado (sucede con un balanceador en algunos casos
+								// que no le quita el puerto a la respuesta y la URL base difiere de la que se esta' mandando aqui')
+								this._delSessionUrl = Infra.FixUrl(this._delSessionUrl);
+								navigator.sendBeacon(this._delSessionUrl, "");
+							}
+						}
+						else {
+							var req;
+
+							if (!Infra.IsIe()) {
+								if (window.XMLHttpRequest) {
+									req = new XMLHttpRequest();
+								}
+								else {
+									if (window.ActiveXObject) {
+										// Internet Explorer
+										req = new ActiveXObject("Microsoft.XMLHTTP");
+									}
+								}
+							}
+
+							// Se elimina la informacio'n de sesio'n
+							try {
+								req.open("GET", this._delSessionUrl, false);
+							}
+							catch (e) {
+								// Puede dar un acceso denegado si viene un puerto equivocado (sucede con un balanceador en algunos casos
+								// que no le quita el puerto a la respuesta y la URL base difiere de la que se esta' mandando aqui')
+								this._delSessionUrl = Infra.FixUrl(this._delSessionUrl);
+								req.open("GET", this._delSessionUrl, false);
+							}
+
+							req.send("");
+
+							Infra.ClearCredentials(this._getAlertUrl, req);
+						}
+					}
+
+
+					/*
+					if (Infra.IsIe()) {
+						document.execCommand('ClearAuthenticationCache');
+					}*/
+				}
+			},
+
+			// Generales:
+
+			// Control de identificacio'n de ejecucio'n de la aplicacio'n
+			_instanceId: null,
+			_instanceIdCheckAlreadyFailed: false,
+
+			// Manejadores asociados al cerrado
+			_unloadEventHandlers: null,
+
+			// Elementos del DOM
+			_topbarContainer: null,
+			_apptabTable: null,
+			_apptabContainer: null,
+			_menuTable: null,
+			_procContainer: null,
+
+			_IsSameInstanceId: function () {
+				if (this._instanceIdCheckAlreadyFailed)
+					return false;
+
+				var id = Infra.GetCookieValue("FRInstanceId");
+
+				// Si no se encuentra se asume que no hubo cambio
+				if ((id == null) || (id == "") || (this._instanceId == null) || (this._instanceId == "") || (id == this._instanceId))
+					return true;
+
+				this._instanceIdCheckAlreadyFailed = true;
+
+				return false;
+			},
+
+			CheckBeforeSubmit: function (delayMessage) {
+				// "delayMessage" -> permite definir un timer para mostrar la alerta y asi' devolver el control enseguida, si no se hace asi', las invocaciones 
+				//                   iniciadas desde flash se realizan ma's de una vez.
+				if (this._IsSameInstanceId())
+					return true;
+
+				var reportMessage = function () {
+					alert(Resources.GetSessionInvalidatedText());
+				};
+
+				if (delayMessage)
+					setTimeout(reportMessage, 1);
+				else
+					reportMessage();
+
+				return false;
+			},
+
+			Refresh: function () {
+				// Se define esta funcio'n para ser utilizada desde el boto'n de la barra superior ya que el mensaje "alert" debe
+				// enviarse con un "timer" por venir desde "flash" (en caso contrario podri'a directamente utilizarse "ProcessManager.RefreshCurrent()"
+
+				// Se valida que no se haya abierto otra sesio'n
+				if (!this.CheckBeforeSubmit(true))
+					return;
+
+				ProcessManager.RefreshCurrent();
+			},
+
+			CloseSession: function () {
+				window.close();
+			},
+
+			CloseWorkSpace: function (fromKeyboard) {
+				// En caso que se venga de una tecla y haya algo en el espacio de trabajo se pregunta antes de cerrarlo
+				if (fromKeyboard && !ProcessManager.CurrentIsEmpty())
+					if (!confirm(Resources.GetWorkSpaceCloseWarningText()))
+						return;
+
+				ProcessManager.CloseCurrent();
+			},
+
+			OpenWorkSpace: function () {
+				// Se valida que no se haya abierto otra sesio'n
+				if (!this.CheckBeforeSubmit(true))
+					return;
+
+				// Si se indico' una cantidad ma'xima de espacios de trabajo se controla que no se exceda la misma
+				if ((this._maximumWS != 0) && (ProcessManager.GetCount() >= this._maximumWS)) {
+					alert(Resources.GetWorkSpaceCountExceededText());
+					return;
+				}
+
+				ProcessManager.StartNew();
+			},
+
+			ClearPopup: function (popupId) {
+				// Reporta un "popup" a remover con el pro'ximo pedido de alerta
+				AlertManager.ClearPopup(popupId);
+			},
+
+			CloseMenu: function () {
+				closeAllMenu();
+			},
+
+			GetClientAreaHeight: function () {
+				return document.body.clientHeight - this._topbarContainer.offsetHeight - this._apptabTable.offsetHeight + 1;
+			},
+
+			AttachUnload: function (handler) {
+				if (this._unloadEventHandlers == null)
+					this._unloadEventHandlers = new Array();
+
+				this._unloadEventHandlers.push(handler);
+			},
+
+			Initialize: function () {
+				var menuUrl = null;
+
+				// Se obtienen todas las propiedades del "opener"
+				try {
+					this._getStepUrl = opener.getGetStepUrl();
+					this._getErrorMsgUrl = opener.getGetErrorMsgUrl();
+					this._delSessionUrl = opener.getDelSessionUrl();
+					this._maximumWS = opener.getMaximumWS();
+					this._numberSeps = opener.getNumSeps();
+					this._flashCodeBase = opener.getFlashCodeBase();
+					this._getAlertUrl = opener.getGetUrl();
+					this._loadInfoUrl = opener.getInfoPanel();											   
+					this._removeAlertUrl = opener.getRmvUrl();
+					this._initialProcessName = opener.getInitName();
+					this._initialProcessUrl = opener.getInitUrl();
+					this._userName = opener.getUserName();
+					this._systemDate = opener.getDate();
+					menuUrl = opener.getGetMenuCodeUrl();
+				}
+				catch (e) {
+					// Si no se consiguio' algu'n valor se reporta el problema y se cancela la carga
+					alert(Resources.GetCompatibilityOpenerMessageText());
+					return;
+				}
+				// Se inicializa la fa'brica de controles de cliente
+				ControlFactory.Initialize(document.getElementById("clientControlContainer"));
+
+				// Se inicializa la barra de herramientas
+				this._topbarContainer = document.getElementById("topbarcontainer");
+
+				if (document.getElementById("user_name"))
+					document.getElementById("user_name").innerText = this._userName;
+
+				document.getElementById("system_date").innerText = "Fecha: " + this._systemDate;
+
+				// Se inicializa la barra de leng'u'etas
+				this._apptabContainer = document.getElementById("apptabcontainer");
+				TabManager.Initialize(this._apptabContainer, ProcessTabBuilder);
+
+				this._apptabTable = document.getElementById("apptabtable");
+
+				// Se consigue el identificador de esta ejecucio'n
+				this._instanceId = Infra.GetCookieValue("FRInstanceId");
+
+				// Se consiguen los objetos DOM a manipular
+				this._menuTable = document.getElementById("menuTable");
+				this._procContainer = document.getElementById("procContainer");
+
+				// Se initializa el menu' y se consigue el co'digo que lo define (la variable "mBuilder" se utiliza directamente desde el co'digo devuelto en la definicio'n)
+				self.mBuilder = new MenuBuilder(this._AttachMenuKey);
+				document.getElementById("menuCode").src = menuUrl;
+
+				// Se definen los manejadores de eventos necesarios
+				if (Infra.IsIe()) {
+					// IE
+					document.body.onload = this._LoadHandlerForIE;
+					document.onselectstart = function () { return false; }; // Se deshabilita la seleccio'n de manera que no se pueda seleccionar toda la pantalla inintencionalmente arrastrando un "popup"
+					document.body.onfocus = function () { ProcessManager.FocusOnCurrent(); } // Esto evita que se salga de un webpanel tabulando en IE
+					self.document.body.onresize = this._ResizeHandler;
+				}
+				else {
+					// MOZ
+					self.onload = this._LoadHandler;
+					self.onresize = this._ResizeHandler;
+					this._menuTable.style.MozUserSelect = "none";
+				}
+				document.body.attachEvent("onmousedown", pageMousedown);
+				document.oncontextmenu = function () { return false; };
+				// Por u'ltimo se inicializa el manejador del teclado
+				KeyboardManager.Initialize();
+				this._ResizeHandler();
+			}
+		};
+	//]]>
+	</script>
+	<link rel="stylesheet" type="text/css" href="styles/menu.css">
+</head>
+
+<body id="body" class="FormBase" scroll="no" style="width: 100%; height: 100%; margin: 0px; zoom: 100%; text-align: center;">
+
+	<!-- Objeto utilizado para obtejer la versio'n del plugin de Acrobat Reader instalado -->
+	<object id="pdfTest" classid="clsid:CA8A9780-280D-11CF-A24D-444553540000" width="0" height="0">
+		<param name="wmode" value="opaque">
+	</object>
+	<!--//DAVID TORRES 2013, print con aspose-->
+	<!-- DIV que cubre todo al inicio hasta que la pa'gina este' completamente cargada -->
+	<!-- Barra de herramientas -->
+	<!-- AV 23/01/2014: Se quita ";text-align:center"   
+		13/03/2014: marign:0 auto
+	-->
+	<div id="topbarcontainer" style="width: 100%; height: 82px; margin-top: -1px;">
+		<div id="header">
+			<a id="logoBco"><img style="border-right:1px solid rgb(0, 0, 0)" src="images/logo_banco.png?20230623"></a>
+			<div class="Temp">
+				<div class="CenterContent" style="height: 43px;">
+					<a id="logo"><img style="border:0px" src="images/logo.gif"></a>
+					<ul class="actions">
+						<li><a href="javascript:ProcessManager.Back();" class="back" title="Atrás">Atrás</a></li>
+						<li><a href="javascript:ProcessManager.Forward();" class="next" title="Adelante">Adelante</a>
+						</li>
+						<li><a href="javascript:TopPageManager.Refresh();" class="refresh" title="Recargar (F5)">Recargar</a></li>
+						<li><a href="javascript:ProcessManager.PrintCurrent();" class="print" title="Imprimir (F12)">Imprimir</a></li>
+
+					</ul>
+					<div id="UserDate">
+						<div class="user">
+							<span class="before"></span>
+							<span id="user_name">Alexander Aguilar</span><a href="javascript:TopPageManager.CloseSession();" class="logout" title="Salir">Salir</a>
+						</div>
+						<p class="date" id="system_date">Fecha: 08/06/26</p>
+					</div>
+				</div>
+				<div id="menuContainer" style="height: 35px; margin: 0 auto;">
+					<table id="menuTable" style="height: 100%; background-color:#FFF; margin: 0 auto;" cellspacing="0" cellpadding="0" onselectstart="return false;">
+						<!-- AV 16/01/2014
+						<tr height="7">
+						-->
+
+						<!-- AV 16/01/2014
+						<tr style="height: 39px">
+						-->
+						<tbody><tr>
+							<td width="1px" nowrap=""></td>
+
+							<td width="532px" nowrap="">
+								<div id="menuBase" style="cursor: default;"><div class="menuBar"><a class="menuButton" style="z-index: 100;">Inicio</a><a class="menuButton" style="padding: 0px 11px 0px 9px;"><img src="./images/ic-bullet.png"></a><a class="menuButton" style="z-index: 199; display: inline; border-bottom: 4px solid rgb(202, 21, 23);">Menú de Consultas Básicas</a></div><iframe style="display: none; position: absolute; z-index: 200" scrolling="no" frameborder="0" src="javascript:&quot;&quot;"></iframe><div style="z-index: 200; display: none; left: 5px; top: 77px; width: 242px;" class="menu"><a type="1" class="menuItem" style="z-index:199">Menú de Cobranzas Judicial<img class="arrow" src="images/arrow.gif"></a><a type="1" class="menuItem" style="z-index:199">Menú de Instalación de Bantotal<img class="arrow" src="images/arrow.gif"></a><a type="1" class="menuItem" style="z-index:199">Menú de Ingreso de Operaciones<img class="arrow" src="images/arrow.gif"></a><a type="1" class="menuItem" style="z-index:199">Menú de Operaciones de Supervisión<img class="arrow" src="images/arrow.gif"></a><a type="1" class="menuItem" style="z-index: 199; display: block;">Menú de Consultas Básicas<img class="arrow" src="images/arrow.gif"></a><a type="1" class="menuItem" style="z-index:199">Menú de Reportes<img class="arrow" src="images/arrow.gif"></a><a type="1" class="menuItem" style="z-index:199">Menú de Consultas<img class="arrow" src="images/arrow.gif"></a><a type="1" class="menuItem" style="z-index:199">Menú de Clientes<img class="arrow" src="images/arrow.gif"></a><a type="1" class="menuItem" style="z-index:199">Menú de Contrapartes<img class="arrow" src="images/arrow.gif"></a><a type="1" class="menuItem" style="z-index:199">Menú de Contabilidad<img class="arrow" src="images/arrow.gif"></a><a type="1" class="menuItem" style="z-index:199">Menú de Caja Chica<img class="arrow" src="images/arrow.gif"></a><a type="1" class="menuItem" style="z-index:199">Menú de Seguros<img class="arrow" src="images/arrow.gif"></a><a type="1" class="menuItem" style="z-index:199">Menú de Comercial<img class="arrow" src="images/arrow.gif"></a><a type="1" class="menuItem" style="z-index:199">Menú de Módulo Normativo<img class="arrow" src="images/arrow.gif"></a><a type="1" class="menuItem" style="z-index:199">Menú de Gestión de Productos y Garantías<img class="arrow" src="images/arrow.gif"></a><a type="1" class="menuItem" style="z-index:199">Menú de Precios<img class="arrow" src="images/arrow.gif"></a><a type="1" class="menuItem" style="z-index:199">Menú de Seguridad<img class="arrow" src="images/arrow.gif"></a><a type="1" class="menuItem" style="z-index:199">Menú Otros<img class="arrow" src="images/arrow.gif"></a><a type="1" class="menuItem" style="z-index:199">Menú del Impresor<img class="arrow" src="images/arrow.gif"></a><a type="1" class="menuItem" style="z-index:199">Menú de Cadena de Cierre<img class="arrow" src="images/arrow.gif"></a><a type="1" class="menuItem" style="z-index:199">Sistema de Conciliaciones<img class="arrow" src="images/arrow.gif"></a><a type="1" class="menuItem" style="z-index:199">Menú de Colocaciones<img class="arrow" src="images/arrow.gif"></a><a type="1" class="menuItem" style="z-index:199">Menú de Riesgos<img class="arrow" src="images/arrow.gif"></a><a type="1" class="menuItem" style="z-index:199">Menú de BTS<img class="arrow" src="images/arrow.gif"></a><a type="1" class="menuItem" style="z-index:199">Menú PAE<img class="arrow" src="images/arrow.gif"></a><a type="1" class="menuItem" style="z-index:199">Menú de Gestión de Cobranzas<img class="arrow" src="images/arrow.gif"></a><a type="1" class="menuItem" style="z-index:199">Menú de Mensajería<img class="arrow" src="images/arrow.gif"></a><a type="1" class="menuItem" style="z-index:199">Menú de Control Dual<img class="arrow" src="images/arrow.gif"></a><a type="1" class="menuItem" style="z-index:199">Menú de Carpeta Digital<img class="arrow" src="images/arrow.gif"></a><a type="1" class="menuItem" style="z-index:199">Bandeja de Tareas<img class="arrow" src="images/arrow.gif"></a><a type="1" class="menuItem" style="z-index:199">Menú Operaciones en Vuelo SIGO - BT<img class="arrow" src="images/arrow.gif"></a></div><iframe style="display: none; position: absolute; z-index:199" scrolling="no" frameborder="0" src="javascript:&quot;&quot;"></iframe><div style="z-index: 201; display: none; left: 248px; top: 191px; width: 242px;" class="menu"><a type="1" class="menuItem" style="z-index:200">Consultas de Clientes<img class="arrow" src="images/arrow.gif"></a><a type="1" class="menuItem" style="z-index:200">Consultas de Contabilidad<img class="arrow" src="images/arrow.gif"></a><a type="1" class="menuItem" style="z-index:200">Consultas de Impresos<img class="arrow" src="images/arrow.gif"></a><a type="1" class="menuItem" style="z-index:200">Consultas de Precios<img class="arrow" src="images/arrow.gif"></a><a onfocus="this.hideFocus=true;return false;" class="menuLeaf" type="0" style="z-index: 200; display: grid;">Consulta de Operaciones Vehiculares<a class="leafComplement" style="visibility: hidden"></a></a><a type="1" class="menuItem" style="z-index:200">Consulta de Deuda del Sistema Financiera<img class="arrow" src="images/arrow.gif"></a><a type="1" class="menuItem" style="z-index:200">Consultas de Matriz de Riesgo<img class="arrow" src="images/arrow.gif"></a><a type="1" class="menuItem" style="z-index:200">Menú de Consultas de Créditos<img class="arrow" src="images/arrow.gif"></a><a type="1" class="menuItem" style="z-index:200">Consultas Gestión de Cobranzas<img class="arrow" src="images/arrow.gif"></a><a type="1" class="menuItem" style="z-index:200">Consultas Límites de Crédito<img class="arrow" src="images/arrow.gif"></a><a type="1" class="menuItem" style="z-index:200">Consulta de Conciliación<img class="arrow" src="images/arrow.gif"></a><a type="1" class="menuItem" style="z-index:200">Consultas de Garantías Recibidas<img class="arrow" src="images/arrow.gif"></a></div><iframe style="display: none; position: absolute; z-index:200" scrolling="no" frameborder="0" src="javascript:&quot;&quot;"></iframe></div>
+								<!-- El cursor es default porque sino en el borde de los menuButton <A> queda mal -->
+							</td>
+
+							<td width="100%"></td>
+						</tr>
+					</tbody></table>
+				</div>
+			</div>
+		</div>
+
+
+
+	</div>
+	<!-- Tabla del menu' -->
+	<!-- AV 15/01/2014: Se modifica width: 900 px por width: 100% para que ocupe toda la pagina 
+	   Se modifica "margin: 0 auto;" por "margin: 0 10; para que no quede tan pegado el "Inicio" a la izq."
+	   Se modifica "height: 48px;" por "height: 40px;"
+	-->
+	<!-- Contenerdor de espacios de trabajo -->
+	<div id="procContainer" style="width: 100%; height: 554px;"><iframe id="1" frameborder="0" style="position: absolute; left: 0px; margin-left: 0px; visibility: visible; opacity: 1; z-index: 1;" height="554" width="100%" scrolling="no" src="javascript:&quot;&quot;"></iframe></div>
+	<!-- Leng'u'etas de espacios de trabajo -->
+	<table cellspacing="0" cellpadding="0" border="0" style="background-color: #fff; width: 100%; height: 26px; position: absolute; left: 0px; bottom: 0px; right: 0px;text-align:center;" id="apptabtable">
+		<tbody><tr>
+			<td width="100%">
+				<div id="Footer" class="Clear">
+
+					<div id="procContainer" style="width: 100%; height: 100%;">
+						<div id="apptabcontainer" class="CenterContent">
+							<!-- TOP BAR -->
+						<ul class="tabs"><li class="active"><a href="#">Consulta de Operaciones Vehiculares</a><div class="close" title="Cerrar (F3)"></div></li><li class="add"><a href="#" title="Nueva Tarea (F2)"><span class="before"></span>Nuevo</a></li></ul><a id="ProcessTabSlideLeftButton" class="slideButton slideLeftButton" href="#" style="display: none;">&lt;</a><a id="ProcessTabSlideRightButton" class="slideButton slideRightButton" href="#" style="display: none;">&gt;</a></div>
+					</div>
+				</div>
+			</td>
+		</tr>
+	</tbody></table>
+
+	<!-- Fondo de mensaje de alertas -->
+	<iframe src="javascript:''" onfocus="document.body.focus()" scrolling="no" frameborder="0" id="messageBack" style="position: absolute; display: none; z-index: 15000; visibility: hidden;"></iframe>
+	<!-- Mensaje de alertas 
+	position: absolute; bottom: 45px; right: 10px; 
+	width: 145px; background: #fff9c3; border:1px solid #eab755; border-radius: 2px; padding:8px 10px 15px; box-shadow: 0 2px 1px #ddd; text-align: center; font-size: 85%; color:#b46600;
+	-->
+	<!--<div id="messageBody" style="position: absolute; z-index: 15001; visibility: hidden;">-->
+
+	<div class="DlyaAlertBody" id="messageBody" style="position:absolute; z-index:15001; visibility:hidden;">
+		<table width="100%" height="100%">
+			<tbody><tr>
+				<td>
+					<table width="100%" height="100%">
+						<tbody><tr>
+							<td><span class="DlyaAlertTitle" id="messageTitle"></span></td>
+							<td><span class="DlyaAlertImg" id="messageImage" onclick="AlertManager.CloseAlert()"></span>
+							</td>
+						</tr>
+						<tr>
+							<td align="center" colspan="2">
+								<table width="100%" height="100%">
+									<tbody><tr>
+										<td align="center">
+											<table align="center" width="100%" height="100%">
+												<tbody><tr>
+													<td>
+														<table align="center" width="100%" height="100%">
+															<tbody><tr>
+																<td align="center">
+																	<!--<p id="messageText" style="font-size: 8.25pt; color:#b46600; margin:5px 0 10px; clear:both; -ms-word-break:break-all; word-break:break-all; -webkit-hyphens:auto; -moz-hyphens:auto; hyphens:auto;"></p>-->
+																	<p class="DlyaAlertText" id="messageText">
+																	</p><a class="DlyaAlertLink" id="messageLink" href="javascript:AlertManager.OpenAlert();">Ver detalle</a>
+																</td>
+
+															</tr>
+														</tbody></table>
+													</td>
+												</tr>
+											</tbody></table>
+										</td>
+									</tr>
+								</tbody></table>
+							</td>
+						</tr>
+					</tbody></table>
+				</td>
+			</tr>
+		</tbody></table>
+	</div><!-- DIV para la inclusio'n de controles -->
+
+
+	<!-- DIV para la calculadora -->
+	<div class="calculadora ui-draggable ui-draggable-handle" id="dxy">
+		<form name="calculator" id="calculator">
+			<div id="cal">
+				<div id="inputFields">
+					<input type="text" id="operandos" name="ans2" value="" style="">
+					<input type="text" id="resultado" name="ans" value="" style="">
+				</div>
+				<div id="buttonsArea">
+					<input type="button" class="boton grayButtons" value="C" onclick="_Calculator.deleteAllCalc()" style="">
+					<input type="button" class="boton grayButtons" value="&lt;" onclick="_Calculator.deleteCalc()" style="">
+					<input type="button" class="boton grayButtons" value="%" onclick="_Calculator.porcentajeCalc()" style="">
+					<input type="button" class="boton redButtons" value="/" onclick="_Calculator.operadorCalc('resultado','/')" style="">
+
+					<br>
+					<input type="button" class="boton" value="7" onclick="_Calculator.numerosCalc('resultado','7')" style="">
+					<input type="button" class="boton" value="8" onclick="_Calculator.numerosCalc('resultado','8')" style="">
+					<input type="button" class="boton" value="9" onclick="_Calculator.numerosCalc('resultado','9')" style="">
+					<input type="button" class="boton redButtons" value="*" onclick="_Calculator.operadorCalc('resultado','*')" style="">
+					<br>
+
+					<input type="button" class="boton" value="4" onclick="_Calculator.numerosCalc('resultado','4')" style="">
+					<input type="button" class="boton" value="5" onclick="_Calculator.numerosCalc('resultado','5')" style="">
+					<input type="button" class="boton" value="6" onclick="_Calculator.numerosCalc('resultado','6')" style="">
+					<input type="button" class="boton redButtons" value="-" onclick="_Calculator.operadorCalc('resultado','-')" style="">
+
+					<br>
+
+					<input type="button" class="boton" value="1" onclick="_Calculator.numerosCalc('resultado','1')" style="">
+					<input type="button" class="boton" value="2" onclick="_Calculator.numerosCalc('resultado','2')" style="">
+					<input type="button" class="boton" value="3" onclick="_Calculator.numerosCalc('resultado','3')" style="">
+					<input type="button" class="boton redButtons" value="+" onclick="_Calculator.operadorCalc('resultado','+')" style="">
+
+					<br>
+					<input type="button" class="botonCero" value="0" onclick="_Calculator.numerosCalc('resultado','0')" style="">
+					<input type="button" class="boton" value="," onclick="_Calculator.operadorCalc('resultado','.')" style="">
+					<input type="button" class="boton redButtons" value="=" onclick="_Calculator.saveCalc()" style="">
+				</div>
+				<input type="button" id="buttonHistory" value="&gt;&gt;" onclick="_Calculator.hideAndShowHistory()" style="">
+			</div>
+
+			<div id="historyArea">
+				<div id="historyListContainer">
+					<ul id="historyList">
+					</ul>
+				</div>
+				<!--<div id="historyButtonContainer">
+					<input type="button" id="historyDeleteButton" value=""  onClick="_Calculator.deleteHistory()" />
+				</div> -->
+			</div>
+		</form>
+	</div><!-- Fin div cal -->
+
+
+	<div id="clientControlContainer"></div>
+
+	<!-- Co'digo de creacio'n del menu' -->
+	<script id="menuCode" type="text/javascript" src="https://azrbttlwsdev01:8067/mafgx16/servlet/com.dlya.bantotal.apfrgetusrmnucode"></script>
+	<script type="text/javascript">
+		//<![CDATA[
+		// Se muestra el cartel de espera inicial centrado (antes del resto de las inclusiones) 
+		var wait = Resources.GetWaitMessage(true);
+
+		wait.SetParent(document.getElementById("initialCover"));
+
+		var l = (document.documentElement.scrollWidth - wait.GetWidth()) / 2;
+		var t = (document.documentElement.scrollHeight - wait.GetHeight()) / 2;
+
+		//        alert("realIndex: l=" + l.toString() + "; t="+ t.toString());
+		//        alert("realIndex: scrollWidth=" + document.documentElement.scrollWidth.toString() + "; scrollHeight=" + document.documentElement.scrollHeight.toString());
+
+		wait.MoveAndShow(l, t);
+		//]]>
+	</script>
+	<script type="text/javascript" src="javascripts/processmanager.js">
+	</script>
+	<script type="text/javascript" src="javascripts/controlfactory.js">
+	</script>
+	<script type="text/javascript" src="javascripts/menu.js">
+	</script>
+	<script type="text/javascript" src="javascripts/menubuilder.js">
+	</script>
+	<script type="text/javascript" src="javascripts/tabmanager.js">
+	</script>
+	<script language="JavaScript" type="text/javascript">
+
+		//<![CDATA[
+		// Inicializaciones
+		TopPageManager.Initialize();
+		//]]>
+	</script>
+	<!--
+	<object id="printControl" classid="CLSID:F94FBCE4-EF19-40C7-BD3E-2FA729853ABB" width="0" height="0">
+	<param name="wmode" value="opaque">
+	</object> 
+	-->
+
+
+</body></html>
