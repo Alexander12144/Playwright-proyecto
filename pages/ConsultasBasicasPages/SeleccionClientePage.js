@@ -63,8 +63,18 @@ class SeleccionClientePage extends BasePage {
         }
 
         await this.btnFiltrar.click();
-        await this.page.waitForTimeout(500);
+        await this.page.waitForTimeout(800);
 
+    }
+
+    /**
+     * Realiza la búsqueda completa y selección de un cliente en una sola acción.
+     * @param {Object} criterios - Datos de búsqueda
+     */
+    async buscarYSeleccionarCliente(criterios) {
+        await this.validarUI();
+        await this.completarDatosBusqueda(criterios);
+        return await this.seleccionarFila(criterios);
     }
 
     async seleccionarFila({ cuenta }) {
@@ -86,8 +96,7 @@ class SeleccionClientePage extends BasePage {
             return false;
         }
 
-        await fila.first().click();
-        await this.btnSiguiente.click();
+        await fila.getByRole('link').click();
 
         return true;
     }

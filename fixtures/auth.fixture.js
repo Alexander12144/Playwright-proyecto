@@ -3,6 +3,7 @@ const { AuthFlows } = require('../flows/AuthFlows');
 const { MenuFlow } = require('../flows/MenuFlow');
 const { BandejaTareasFlow } = require('../flows/BandejaTareasFlow/BandejaTareasFlow');
 const { OperacionesVehicularesFlow } = require('../flows/ConsultasBasicasFlow/OperacionesVehicularesFlow');
+const { ConsultaInstanciasFlow } = require('../flows/BandejaTareasFlow/ConsultaInstanciasFlow');
 
 exports.test = base.test.extend({
     // Fixture para tests de Login (página limpia)
@@ -36,6 +37,11 @@ exports.test = base.test.extend({
     // Fixture para Consulta de Operaciones Vehiculares (inyectamos la página autenticada)
     operacionesVehicularesFlow: async ({ authenticatedPage }, use) => {
         await use(new OperacionesVehicularesFlow(authenticatedPage));
+    },
+
+    // Fixture para Consulta de Instancias (inyectamos la página autenticada)
+    consultaInstanciasFlow: async ({ authenticatedPage }, use) => {
+        await use(new ConsultaInstanciasFlow(authenticatedPage));
     }
     
 });

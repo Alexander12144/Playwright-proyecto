@@ -10,9 +10,9 @@ class OperacionesVehicularesPage extends BasePage {
         this._frameSelector = 'iframe[name="process1_step1"]';
         this._activeBaseFrame = null;
         this.nav = new BantotalNavigator(this.baseFrame);
-        this.seleccionCliente = new SeleccionClientePage(this.page);
+        // Eliminamos la instanciación de SeleccionClientePage de aquí, 
+        // ya que el popup usa un objeto 'page' (ventana) distinto.
     }
-
     // -------------------- Frame helpers --------------------
 
     get frameSelector() {
@@ -60,7 +60,6 @@ class OperacionesVehicularesPage extends BasePage {
     
     /**
      * Aplica filtros combinados para cuenta, operación y/o estado.
-     * @param {{cuenta?: string|number, operacion?: string|number, estado?: string|number}} [filtros={}] 
      */
     async filtrarOperaciones({ cuenta, operacion, estado } = {}) {
         if (cuenta != null) {
@@ -79,8 +78,18 @@ class OperacionesVehicularesPage extends BasePage {
     }
 
     /**
+     * Filtra y selecciona una operación. Lanza error si no hay resultados.
+     */
+    async buscarYSeleccionarOperacion(filtros) {
+        const tieneResultados = await this.filtrarOperaciones(filtros);
+        if (!tieneResultados) {
+            throw new Error(`La búsqueda no retornó resultados para: ${JSON.stringify(filtros)}`);
+        }
+        await this.seleccionarFila(filtros);
+    }
+
+    /**
      * Selecciona la fila que coincide con los filtros aplicados.
-     * @param {{cuenta?: string|number, operacion?: string|number, estado?: string|number}} [filtros={}] 
      */
     async seleccionarFila({ cuenta, operacion, estado }) {
         let fila = this.baseFrame.locator('[id^="GridopervehiContainerRow_"]');
@@ -113,7 +122,7 @@ class OperacionesVehicularesPage extends BasePage {
 
         if (count === 0) {
             throw new Error(
-                `No se encontró fila con cuenta=${cuenta}, operacion=${operacion}, estado=${estado}`
+                `Error Técnico: Se esperaba encontrar la fila pero no está presente en el DOM.`
             );
         }
 
@@ -190,15 +199,22 @@ class OperacionesVehicularesPage extends BasePage {
         return await this.filtrar();
     }
 
+    /**
+     * Dispara la apertura del popup de búsqueda.
+     * @returns {Promise<Page>} La instancia de la nueva ventana.
+     */
     async buscarCuentaCliente() {
         const [popup] = await Promise.all([
             this.page.waitForEvent('popup'),
             this.click(this.btnCuentaCliente, this.baseFrame)
         ]);
-
-        await popup.waitForLoadState();
-
+        
+        await popup.waitForLoadState('networkidle');
         return popup;
+    }
+
+    async obtenerCuenta() {
+        return await this.valorCuenta.inputValue();
     }
 }
 

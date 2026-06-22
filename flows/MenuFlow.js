@@ -31,6 +31,18 @@ class MenuFlow {
         await this.homePage.menu.bandejaEntradaMenu.click();
     }
 
+    async irAConsultaInstanciaAdministrador() {
+        await this.homePage.esperarCarga();
+        await this.homePage.menu.inicioMenu.click();
+
+        await expect(this.homePage.menu.bandejaTareasMenu).toBeVisible({ timeout: TIMEOUTS.MEDIUM });
+        await this.homePage.menu.bandejaTareasMenu.click();
+
+        await expect(this.homePage.menu.consultaInstanciaAdministrador).toBeVisible({ timeout: TIMEOUTS.MEDIUM });
+        await this.homePage.menu.consultaInstanciaAdministrador.click();
+ //await this.page.frameLocator('iframe').locator('text=Consultar Instancias').waitFor({ state: 'visible', timeout: TIMEOUTS.MEDIUM });
+    }
+
     async irAConsultaOperacionesVehiculares() {
         await this.homePage.esperarCarga();
         await this.homePage.menu.inicioMenu.click();
