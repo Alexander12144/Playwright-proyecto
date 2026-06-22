@@ -9,7 +9,7 @@ module.exports = defineConfig({
   testDir: './tests',
   fullyParallel: false, // 
   forbidOnly: !!process.env.CI,
-  retries: 1, 
+  retries: process.env.CI ? 1 : 0,
   workers: 1,
 
   reporter: [
@@ -32,13 +32,16 @@ module.exports = defineConfig({
       ]
     },
 
-    trace: 'retain-on-failure',
-    screenshot: 'on', // Cáptura todo para ver qué pasa en cada paso
-    video: 'retain-on-failure',
+    trace: 'on-first-retry',
+    screenshot: 'only-on-failure', // Guardar capturas solo en fallos para reducir ruidos para reducir ruido
+    video: 'on-first-retry',
 
     locale: 'es-PE',
     timezoneId: 'America/Lima',
     viewport: { width: 1366, height: 1000 },
+    expect: {
+      timeout: 10000, // Aumentar a 10s para mayor estabilidad en aserciones
+    },
   },
 
   projects: [{
