@@ -33,6 +33,11 @@ const FRAMES = {
     getFrameSelector: (stepNum) => `iframe[name^="process"][name$="_step${stepNum}"]`
 };
 
+// ========== TEXTOS DE UI ==========
+const TEXTS = {
+    VALIDAR_DATOS: 'Validar Datos'
+};
+
 // ========== MENSAJES ==========
 const MESSAGES = {
     LOGIN_SUCCESS: 'Sesión iniciada',
@@ -51,13 +56,18 @@ const MESSAGES = {
 // ========== TEST DATA ==========
 const TEST_DATA = {
     VALID_USER: process.env.USER || 'default_user',
-    VALID_PASSWORD: process.env.PASSWORD || 'default_pass'
+    VALID_PASSWORD: process.env.PASSWORD || 'default_pass',
+    /** Número de instancia para consulta WF (configurable por ambiente). */
+    INSTANCIA_CONSULTA: process.env.INSTANCIA_CONSULTA || '918674',
+    /** Número de instancia existente en bandeja para flujos vehiculares. */
+    INSTANCIA_EXISTENTE: process.env.INSTANCIA_EXISTENTE || '918094'
 };
 
 module.exports = {
     URLS,
     TIMEOUTS,
     FRAMES,
+    TEXTS,
     MESSAGES,
     TEST_DATA
 };

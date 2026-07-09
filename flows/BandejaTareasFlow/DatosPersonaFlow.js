@@ -39,16 +39,6 @@ class DatosPersonaFlow {
             await step4Frame.waitFor({ state: 'visible', timeout: TIMEOUTS.PROCESSING_MAX }).catch(() => {});
         }
     }
-
-    /**
-     * Retrocede al paso anterior en el flujo.
-     * @returns {Promise<void>}
-     * @throws {Error} Si fallo de navegación hacia atrás
-     */
-    async irAtras() {
-        await this.personaPage.esperarCarga();
-        await this.personaPage.click(() => this.personaPage.linkAnterior, this.personaPage.baseFrame);
-    }
 }
 
 module.exports = { DatosPersonaFlow };

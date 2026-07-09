@@ -32,6 +32,24 @@ test.describe('Módulo de Operaciones Vehiculares - Bantotal', () => {
             nombre: 'Debe mostrar resultados cuando se filtra con datos válidos',
             datos: OPERACIONES_VEHICULARES_VALIDAS,
             resultadoEsperado: true
+        },
+        {
+            nombre: 'Debe mostrar resultados cuando se filtra solo con cuenta válida',
+            datos: { cuenta: OPERACIONES_VEHICULARES_VALIDAS.cuenta },
+            resultadoEsperado: true
+        },
+        {
+            nombre: 'Debe mostrar resultados cuando se filtra solo con operación válida',
+            datos: { operacion: OPERACIONES_VEHICULARES_VALIDAS.operacion },
+            resultadoEsperado: true
+        },
+        {
+            nombre: 'Debe mostrar sin resultados cuando se combina una cuenta válida con una operación inválida',
+            datos: {
+                cuenta: OPERACIONES_VEHICULARES_VALIDAS.cuenta,
+                operacion: OPERACIONES_VEHICULARES_INVALIDAS.operacion
+            },
+            resultadoEsperado: false
         }
     ];
 

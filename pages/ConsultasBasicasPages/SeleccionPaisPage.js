@@ -70,3 +70,5 @@ class SeleccionPaisPage extends BasePage {
         await expect(this.btnCerrar).toBeVisible(timeout);
     }
 }
+
+module.exports = { SeleccionPaisPage };

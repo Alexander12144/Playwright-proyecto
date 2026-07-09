@@ -1,10 +1,10 @@
 const { expect } = require('@playwright/test');
 const { BasePage } = require('../BasePage');
-const { TIMEOUTS, FRAMES} = require('../../utils/constants');
+const { TIMEOUTS, FRAMES } = require('../../utils/constants');
 const { BantotalNavigator } = require('../components/BantotalNavigator');
 
 /**
- * Page Object para la Consulta de Instancias (Step 2).
+ * Page Object para la pantalla Consulta de Instancias WF.
  */
 class ConsultaInstanciasPage extends BasePage {
     constructor(page) {
@@ -12,6 +12,7 @@ class ConsultaInstanciasPage extends BasePage {
         this.frameSelector = FRAMES.BANDEJA_STEP1;
         this.nav = new BantotalNavigator(this.baseFrame);
     }
+
     get baseFrame() { return this.mainFrame.frameLocator(this.frameSelector); }
 
     get tituloFrame() { return this.baseFrame.getByText('Consulta de Instancias'); }
@@ -33,7 +34,7 @@ class ConsultaInstanciasPage extends BasePage {
     get valorValor() { return this.baseFrame.locator('#vFWFATTSVAL'); }
 
     get checkActiva() { return this.baseFrame.getByRole('checkbox', { name: '_' }); }
-    get btnFiltrar() { return this.baseFrame.getByRole('link', { name: 'Filtrar' }); }
+    get btnFiltrar() { return this.nav.btnFiltrar; }
     get btnDatos() { return this.baseFrame.getByRole('link', { name: 'Datos.Ing' }); }
     get btnConsultar() { return this.baseFrame.getByRole('link', { name: 'Consultar' }); }
     get btnAsientos() { return this.baseFrame.getByRole('link', { name: 'Asientos' }); }
@@ -48,19 +49,21 @@ class ConsultaInstanciasPage extends BasePage {
     get btnReEjecutar() { return this.baseFrame.getByRole('link', { name: 'Re-Ejecutar' }); }
     get btnImpresos() { return this.baseFrame.getByRole('link', { name: 'Impresos' }); }
 
-    get selectFecInicio() { return this.baseFrame.locator('#vFFECHADESDE_dp_trigger'); }
-    get selectFecFin() { return this.baseFrame.locator('#vFFECHAHASTA_dp_trigger'); }
-
     get labelAdvertencia() { return this.baseFrame.getByText('Debe ingresar Proceso'); }
     get labelSinResultados() { return this.baseFrame.getByText('No hay registros'); }
-    async filtrarInstancias() {
-        await this.btnFiltrar.click();
-    }
 
+    /**
+     * Valida la presencia del mensaje de advertencia por proceso vacío.
+     * @returns {Promise<void>}
+     */
     async validarMensajeAdvertencia() {
         await expect(this.labelAdvertencia).toBeVisible();
     }
 
+    /**
+     * Valida los elementos principales de la pantalla de consulta.
+     * @returns {Promise<void>}
+     */
     async validarUI() {
         await expect(this.tituloFrame).toBeVisible();
         await expect(this.labelProceso).toBeVisible();
@@ -97,13 +100,32 @@ class ConsultaInstanciasPage extends BasePage {
         await expect(this.btnFiltrar).toBeVisible();
     }
 
+    /**
+     * Valida el mensaje de grilla vacía.
+     * @returns {Promise<void>}
+     */
     async validarSinResultados() {
         await expect(this.labelSinResultados).toBeVisible();
     }
 
-    async filtrarInstancias({proceso, usuario, instancia, fecInicio, fecFin, dato, valor, activa} = {}) {
+    /**
+     * Aplica criterios opcionales y ejecuta la búsqueda con el botón Filtrar.
+     * @param {Object} [criterios={}]
+     * @param {string|number} [criterios.proceso]
+     * @param {string|number} [criterios.usuario]
+     * @param {string|number} [criterios.instancia]
+     * @param {string} [criterios.fecInicio]
+     * @param {string} [criterios.fecFin]
+     * @param {string|number} [criterios.dato]
+     * @param {string|number} [criterios.valor]
+     * @param {boolean} [criterios.activa]
+     * @returns {Promise<void>}
+     */
+    async filtrarInstancias(criterios = {}) {
+        const { proceso, usuario, instancia, fecInicio, fecFin, dato, valor, activa } = criterios;
+
         if (proceso) {
-            this.completarCampo(this.valorProceso, proceso);
+            await this.completarCampo(this.valorProceso, proceso);
         }
 
         if (usuario) {
@@ -142,12 +164,8 @@ class ConsultaInstanciasPage extends BasePage {
             }
         }
 
-        await this.btnFiltrar.click();
-    }
-    
-    async seleccionarFila() {
-        await this.btnSeleccionar.click();
+        await this.click(() => this.btnFiltrar, () => this.baseFrame);
     }
 }
 
-module.exports = { ConsultaInstanciasPage }
+module.exports = { ConsultaInstanciasPage };

@@ -1,3 +1,4 @@
+const { expect } = require('@playwright/test');
 const { BasePage } = require('../BasePage');
 const { TIMEOUTS, FRAMES } = require('../../utils/constants');
 const { BantotalNavigator } = require('../components/BantotalNavigator');
@@ -121,18 +122,11 @@ class DatosPersonaPage extends BasePage {
   }
 
   async _ensurePageLoad() {
-    const timeout = TIMEOUTS.MEDIUM;
-    const candidateFrames = this.page.frames().filter(frame => /process.*_step/i.test(frame.name()));
+    const activeFrame = await this._findActiveProcessFrame({ headerText: 'Instancia' });
 
-    for (const candidate of candidateFrames) {
-      try {
-        await this.waitForFrameStable(() => candidate);
-        const header = candidate.getByText('Instancia').first();
-        await expect(header).toBeVisible({ timeout });
-        this._activeBaseFrame = candidate;
-        return;
-      } catch {
-      }
+    if (activeFrame) {
+      this._activeBaseFrame = activeFrame;
+      return;
     }
 
     await this._ensurePageLoadForFrames(

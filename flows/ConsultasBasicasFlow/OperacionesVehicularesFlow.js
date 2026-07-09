@@ -14,7 +14,6 @@ class OperacionesVehicularesFlow {
 
     // Filtra directamente en la pantalla de operaciones vehiculares, sin pasar por el popup de selección de cliente
     async filtrarOperaciones({ cuenta, operacion, estado } = {}) {
-        console.log(`[Flow] Filtrando operación: Cuenta=${cuenta}`);
         await this.operacionesVehicularesPage.esperarCarga();
         
         const tieneResultados = await this.operacionesVehicularesPage.filtrarOperaciones({ cuenta, operacion, estado });
@@ -37,8 +36,6 @@ class OperacionesVehicularesFlow {
      * 5. Selecciona el registro correspondiente en la grilla principal.
      */
     async seleccionarCuentaCliente(pais, tipoDocumento, cuenta) {
-        console.log(`[Flow] Iniciando búsqueda de cliente: ${cuenta}`);
-
         const popup = await this.operacionesVehicularesPage.buscarCuentaCliente();
 
         this.seleccionCliente = new SeleccionClientePage(popup);

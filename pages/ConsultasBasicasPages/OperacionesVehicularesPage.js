@@ -1,19 +1,15 @@
 const { expect } = require('@playwright/test');
 const { BasePage } = require('../BasePage');
-const { TIMEOUTS } = require('../../utils/constants');
+const { TIMEOUTS, FRAMES } = require('../../utils/constants');
 const { BantotalNavigator } = require('../components/BantotalNavigator');
-const { SeleccionClientePage } = require('./SeleccionClientePage');
 
 class OperacionesVehicularesPage extends BasePage {
     constructor(page) {
         super(page);
-        this._frameSelector = 'iframe[name="process1_step1"]';
+        this._frameSelector = FRAMES.BANDEJA_STEP1;
         this._activeBaseFrame = null;
         this.nav = new BantotalNavigator(this.baseFrame);
-        // Eliminamos la instanciación de SeleccionClientePage de aquí, 
-        // ya que el popup usa un objeto 'page' (ventana) distinto.
     }
-    // -------------------- Frame helpers --------------------
 
     get frameSelector() {
         return this._frameSelector;
@@ -24,24 +20,17 @@ class OperacionesVehicularesPage extends BasePage {
     }
 
     async _ensurePageLoad() {
-        const timeout = TIMEOUTS.MEDIUM;
-        const candidateFrames = this.page.frames().filter(frame => /process.*_step/i.test(frame.name()));
+        const activeFrame = await this._findActiveProcessFrame({
+            headerText: 'Consulta de Operaciones Vehiculares'
+        });
 
-        for (const candidate of candidateFrames) {
-            try {
-                await this.waitForFrameStable(() => candidate);
-                const header = candidate.locator('text=Consulta de Operaciones Vehiculares').first();
-                await expect(header).toBeVisible({ timeout });
-                this._activeBaseFrame = candidate;
-                return;
-            } catch {
-            }
+        if (activeFrame) {
+            this._activeBaseFrame = activeFrame;
+            return;
         }
 
         throw new Error('No se pudo detectar el frame activo de Operaciones Vehiculares');
     }
-
-    // -------------------- Locators --------------------
 
     get labelEncabezado() { return this.baseFrame.getByText('Consulta de Operaciones Vehiculares'); }
     get labelTitulo() { return this.baseFrame.getByText('Operaciones', { exact: true }); }
@@ -58,6 +47,98 @@ class OperacionesVehicularesPage extends BasePage {
     get labelSinResultados() { return this.baseFrame.getByText('No hay registros'); }
     get btnCuentaCliente() {return this.baseFrame.getByRole('row', { name: '0', exact: true }).getByRole('link');}
     
+    // ========== MÉTODOS PRIVADOS: Solo UI, sin lógica de negocio ==========
+
+    /**
+     * Retorna el locator base de las filas del grid.
+     * @private
+     * @returns {import('@playwright/test').Locator}
+     */
+    _getGridFilas() {
+        return this.baseFrame.locator('[id^="GridopervehiContainerRow_"]');
+    }
+
+    /**
+     * Aplica filtros a un locator de filas.
+     * Solo filtra, sin validar cantidad.
+     * @private
+     * @param {import('@playwright/test').Locator} fila - Locator base
+     * @param {Object} criterios - { cuenta?, operacion?, estado? }
+     * @returns {import('@playwright/test').Locator} Filas filtradas
+     */
+    _filtrarFilasPor(fila, { cuenta, operacion, estado } = {}) {
+        let resultado = fila;
+
+        if (cuenta) {
+            resultado = resultado.filter({
+                has: this.baseFrame.getByRole('cell', { name: cuenta.toString() })
+            });
+        }
+
+        if (operacion) {
+            resultado = resultado.filter({
+                has: this.baseFrame.getByRole('cell', { name: operacion.toString() })
+            });
+        }
+
+        if (estado) {
+            resultado = resultado.filter({
+                has: this.baseFrame.getByRole('cell', { name: estado.toString() })
+            });
+        }
+
+        return resultado;
+    }
+
+    /**
+     * Retorna filas que cumplen criterios, sin validar cantidad.
+     * @private
+     * @param {Object} criterios - { cuenta?, operacion?, estado? }
+     * @returns {Promise<import('@playwright/test').Locator>}
+     */
+    async _obtenerFilasQueCumplen(criterios) {
+        const gridFilas = this._getGridFilas();
+        return this._filtrarFilasPor(gridFilas, criterios);
+    }
+
+    /**
+     * Valida y retorna una única fila que cumple los criterios.
+     * Lanza error si no hay exactamente una fila.
+     * @private
+     * @param {Object} criterios - { cuenta?, operacion?, estado? }
+     * @returns {Promise<import('@playwright/test').Locator>}
+     */
+    async _obtenerFilaUnica(criterios) {
+        const fila = await this._obtenerFilasQueCumplen(criterios);
+        const count = await fila.count();
+
+        if (count === 0) {
+            throw new Error(
+                `Error Técnico: Se esperaba encontrar la fila pero no está presente en el DOM.`
+            );
+        }
+
+        if (count > 1) {
+            throw new Error(
+                `Se encontraron ${count} filas para ${JSON.stringify(criterios)}`
+            );
+        }
+
+        return fila;
+    }
+
+    /**
+     * Hace clic en una fila sin lógica adicional.
+     * @private
+     * @param {import('@playwright/test').Locator} fila
+     * @returns {Promise<void>}
+     */
+    async _clickEnFila(fila) {
+        await fila.first().click();
+    }
+
+    // ========== MÉTODOS PÚBLICOS: Mantienen interfaz existente ==========
+
     /**
      * Aplica filtros combinados para cuenta, operación y/o estado.
      */
@@ -90,53 +171,12 @@ class OperacionesVehicularesPage extends BasePage {
 
     /**
      * Selecciona la fila que coincide con los filtros aplicados.
+     * Ahora internamente usa métodos simples (_*) sin lógica de negocio.
      */
-    async seleccionarFila({ cuenta, operacion, estado }) {
-        let fila = this.baseFrame.locator('[id^="GridopervehiContainerRow_"]');
-
-        if (cuenta) {
-            fila = fila.filter({
-                has: this.baseFrame.getByRole('cell', {
-                    name: cuenta.toString()
-                })
-            });
-        }
-
-        if (operacion) {
-            fila = fila.filter({
-                has: this.baseFrame.getByRole('cell', {
-                    name: operacion.toString()
-                })
-            });
-        }
-
-        if (estado) {
-            fila = fila.filter({
-                has: this.baseFrame.getByRole('cell', {
-                    name: estado.toString()
-                })
-            });
-        }
-
-        const count = await fila.count();
-
-        if (count === 0) {
-            throw new Error(
-                `Error Técnico: Se esperaba encontrar la fila pero no está presente en el DOM.`
-            );
-        }
-
-        if (count > 1) {
-            throw new Error(
-                `Se encontraron ${count} filas para cuenta=${cuenta}, operacion=${operacion}, estado=${estado}`
-            );
-        }
-
-        await fila.first().click();
-
-        // Seleccionar la fila encontrada
+    async seleccionarFila(criterios) {
+        const fila = await this._obtenerFilaUnica(criterios);
+        await this._clickEnFila(fila);
         await this.seleccionar();
-
         await this.esperarCarga();
     }
 
@@ -184,23 +224,8 @@ class OperacionesVehicularesPage extends BasePage {
         await this.btnSeleccionar.click();
     }
 
-    async filtrarOperacion(operacion) {
-        await this.completarCampo(this.valorOperacion, operacion);
-        return await this.filtrar();
-    }
-
-    async filtrarCuenta(cuenta) {
-        await this.completarCampo(this.valorCuenta, cuenta);
-        return await this.filtrar();
-    }
-
-    async filtrarEstado(estado) {
-        await this.completarCampo(this.valorEstado, estado);
-        return await this.filtrar();
-    }
-
     /**
-     * Dispara la apertura del popup de búsqueda.
+     * Dispara la apertura del popup de búsqueda de cuenta cliente.
      * @returns {Promise<Page>} La instancia de la nueva ventana.
      */
     async buscarCuentaCliente() {

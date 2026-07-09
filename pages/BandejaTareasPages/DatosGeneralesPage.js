@@ -38,18 +38,11 @@ class DatosGeneralesPage extends BasePage {
     get linkSiguiente() { return this.nav.btnSiguiente; }
 
     async _ensurePageLoad() {
-        const timeout = TIMEOUTS.MEDIUM;
-        const candidateFrames = this.page.frames().filter(frame => /process.*_step/i.test(frame.name()));
+        const activeFrame = await this._findActiveProcessFrame();
 
-        for (const candidate of candidateFrames) {
-            try {
-                await this.waitForFrameStable(() => candidate);
-                //const header = candidate.locator('#HTMLTXTTITLE1').first();
-                //await expect(header).toBeVisible({ timeout });
-                this._activeBaseFrame = candidate;
-                return;
-            } catch {
-            }
+        if (activeFrame) {
+            this._activeBaseFrame = activeFrame;
+            return;
         }
 
         await this._ensurePageLoadForFrames(
@@ -76,31 +69,6 @@ class DatosGeneralesPage extends BasePage {
         ];
 
         await this.fillForm(mapping, data, this.baseFrame);
-    }
-
-    async prepararCamposParaValidacion(data = {}) {
-        const camposForzados = [];
-
-        if (!data.numDoc) {
-            await this.clear(() => this.inputNumeroDocumento, this.baseFrame);
-            camposForzados.push('numDoc');
-        }
-
-        if (!data.tipoDoc) {
-            try {
-                const tieneVacio = await this.selectTipoDocumento.evaluate((sel) =>
-                    Array.from(sel.options || []).some(opt => opt.value === '')
-                );
-                if (tieneVacio) {
-                    await this.selectOption(() => this.selectTipoDocumento, '', this.baseFrame);
-                    camposForzados.push('tipoDoc');
-                }
-            } catch {
-
-            }
-        }
-
-        return camposForzados;
     }
 
     async ejecutarValidacion() {

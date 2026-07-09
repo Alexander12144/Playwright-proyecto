@@ -32,9 +32,9 @@ module.exports = defineConfig({
       ]
     },
 
-    trace: 'on-first-retry',
-    screenshot: 'only-on-failure', // Guardar capturas solo en fallos para reducir ruidos para reducir ruido
-    video: 'on-first-retry',
+    trace: process.env.CI ? 'retain-on-failure' : 'on',
+    screenshot: process.env.CI ? 'only-on-failure' : 'on',
+    video: process.env.CI ? 'retain-on-failure' : 'on',
 
     locale: 'es-PE',
     timezoneId: 'America/Lima',

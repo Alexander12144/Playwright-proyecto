@@ -1,8 +1,11 @@
 const { expect } = require('@playwright/test');
 const { BasePage } = require('../BasePage');
-const { TIMEOUTS, FRAMES} = require('../../utils/constants');
+const { TIMEOUTS, FRAMES } = require('../../utils/constants');
 const { BantotalNavigator } = require('../components/BantotalNavigator');
 
+/**
+ * Page Object para la pantalla Iniciar Instancia de Proceso (Step 2).
+ */
 class IniciarProcesoPage extends BasePage {
     constructor(page) {
         super(page);
@@ -17,6 +20,11 @@ class IniciarProcesoPage extends BasePage {
     get btnIniciar() { return this.nav.btnIniciar; }
     get btnCancelar() { return this.nav.btnCancelar; }
 
+    /**
+     * Localizador del flujo de proceso a iniciar.
+     * @param {string} nombreFlujo - Nombre exacto del flujo en pantalla.
+     * @returns {import('@playwright/test').Locator}
+     */
     getFlujoLocator(nombreFlujo) {
         return this.baseFrame.getByText(nombreFlujo, { exact: true });
     }
@@ -29,6 +37,10 @@ class IniciarProcesoPage extends BasePage {
         return [this.titulo];
     }
 
+    /**
+     * Valida que los flujos vehiculares esperados estén disponibles en pantalla.
+     * @returns {Promise<void>}
+     */
     async validarDisponibilidadDeFlujos() {
         await this.esperarCarga();
         const flujosEsperados = [

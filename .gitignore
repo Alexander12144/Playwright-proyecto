@@ -40,6 +40,10 @@ target/
 .DS_Store
 Thumbs.db
 
+# --- Artefactos locales de depuración ---
+artifacts/
+tmp/
+
 # --- Reportes de Allure ---
 allure-results/
 allure-report/

@@ -1,10 +1,13 @@
-const { test, expect } = require('../fixtures/auth.fixture');
+const { test } = require('../fixtures/auth.fixture');
 const { BASE_CREDITO_VEHICULAR, buildDatosIncompletos } = require('../fixtures/data/creditoVehicular.data');
+const { TIMEOUTS } = require('../utils/constants');
 
 /**
- * Cobertura adicional para el flujo de Datos Generales utilizando POM y flujos reutilizables.
+ * Validaciones del paso Datos Generales en el flujo de Créditos Vehiculares.
  */
-test.describe('Validaciones de Datos Generales - Créditos Vehiculares', () => { test.setTimeout(60000);
+test.describe('Validaciones de Datos Generales - Créditos Vehiculares', () => {
+    test.setTimeout(TIMEOUTS.PROCESSING_MAX);
+
     test('Debe mostrar errores cuando faltan tipo de documento y número de documento', async ({ menuFlow, bandejaFlow }) => {
         await menuFlow.irABandejaDeEntrada();
 
@@ -13,19 +16,9 @@ test.describe('Validaciones de Datos Generales - Créditos Vehiculares', () => {
             buildDatosIncompletos(),
             { validarExito: false }
         );
-    });
 
-    test('Debe mantener el resultado de validación vacío cuando la validación falla', async ({ menuFlow, bandejaFlow }) => {
-        await menuFlow.irABandejaDeEntrada();
-
-        await bandejaFlow.crearNuevaSolicitudVehicular(
-            'Flujo Vehicular / StartSolicitud',
-            buildDatosIncompletos(),
-            { validarExito: false }
-        );
-
-        await expect(bandejaFlow.datosGeneralesFlow.datosPage.inputResultadoValidacion).toHaveValue('', { timeout: 10000 });
-        await expect(bandejaFlow.datosGeneralesFlow.datosPage.baseFrame.getByText(/Debe\s+/).first()).toBeVisible({ timeout: 10000 });
+        await bandejaFlow.validarResultadoValidacionVacio();
+        await bandejaFlow.validarMensajesObligatoriosDatosGenerales();
     });
 
     test('Debe completar el campo de resultado de validación con datos válidos al ejecutar solo la validación', async ({ menuFlow, bandejaFlow }) => {
@@ -37,6 +30,6 @@ test.describe('Validaciones de Datos Generales - Créditos Vehiculares', () => {
             { validarExito: false }
         );
 
-        await expect(bandejaFlow.datosGeneralesFlow.datosPage.inputResultadoValidacion).not.toHaveValue('', { timeout: 10000 });
+        await bandejaFlow.validarResultadoValidacionCompleto();
     });
 });

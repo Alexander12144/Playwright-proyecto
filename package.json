@@ -7,11 +7,7 @@
     "test": "npx playwright test",
     "test:headed": "npx playwright test --headed",
     "test:report": "npx playwright show-report",
-    "test:debug": "npx playwright test --debug",
-
-    "cucumber": "cucumber-js features/**/*.feature --require support/hooks.js --require step_definitions/**/*.js",
-    "cucumber:smoke": "npm run cucumber -- --tags '@smoke'",
-    "cucumber:parallel": "npm run cucumber -- --parallel 3"
+    "test:debug": "npx playwright test --debug"
   },
   "keywords": [],
   "author": "",

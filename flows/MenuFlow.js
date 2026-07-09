@@ -15,56 +15,55 @@ class MenuFlow {
     }
 
     /**
-     * Navega desde Home a Bandeja de Entrada a través de menús secuenciales.
-     * Precondición: Usuario autenticado en página de Home.
-     * @throws {Error} Si alguno de los menús no aparece o click falla
+     * Abre el menú Inicio desde la pantalla principal.
      * @returns {Promise<void>}
      */
-    async irABandejaDeEntrada() {
+    async _abrirMenuInicio() {
         await this.homePage.esperarCarga();
-        await this.homePage.menu.inicioMenu.click();
-        
-        await expect(this.homePage.menu.bandejaTareasMenu).toBeVisible({ timeout: TIMEOUTS.MEDIUM });
-        await this.homePage.menu.bandejaTareasMenu.click();
-
-        await expect(this.homePage.menu.bandejaEntradaMenu).toBeVisible({ timeout: TIMEOUTS.MEDIUM });
-        await this.homePage.menu.bandejaEntradaMenu.click();
-    }
-
-    async irAConsultaInstanciaAdministrador() {
-        await this.homePage.esperarCarga();
-        await this.homePage.menu.inicioMenu.click();
-
-        await expect(this.homePage.menu.bandejaTareasMenu).toBeVisible({ timeout: TIMEOUTS.MEDIUM });
-        await this.homePage.menu.bandejaTareasMenu.click();
-
-        await expect(this.homePage.menu.consultaInstanciaAdministrador).toBeVisible({ timeout: TIMEOUTS.MEDIUM });
-        await this.homePage.menu.consultaInstanciaAdministrador.click();
- //await this.page.frameLocator('iframe').locator('text=Consultar Instancias').waitFor({ state: 'visible', timeout: TIMEOUTS.MEDIUM });
-    }
-
-    async irAConsultaOperacionesVehiculares() {
-        await this.homePage.esperarCarga();
-        await this.homePage.menu.inicioMenu.click();
-
-        await expect(this.homePage.menu.consultasBasicasMenu).toBeVisible({ timeout: TIMEOUTS.MEDIUM });
-        await this.homePage.menu.consultasBasicasMenu.click();
-
-        await expect(this.homePage.menu.consultaOperacionesVehiculares).toBeVisible({ timeout: TIMEOUTS.MEDIUM });
-        await this.homePage.menu.consultaOperacionesVehiculares.click();
-
-        await this.page.waitForLoadState('networkidle');
+        await this.homePage.click(() => this.homePage.menu.inicioMenu, this.page);
     }
 
     /**
-     * Recarga la página principal sincronizando estado.
-     * Útil para limpiar caché de sesión o reinicar flujos.
-     * @throws {Error} Si recarga falla o home no se estabiliza
+     * Navega hasta el submenú Bandeja de Tareas.
      * @returns {Promise<void>}
      */
-    async refrescarHome() {
-        await this.homePage.btnRecargar.click();
-        await this.homePage.esperarCarga();
+    async _abrirSubmenuBandejaTareas() {
+        await this._abrirMenuInicio();
+        await expect(this.homePage.menu.bandejaTareasMenu).toBeVisible({ timeout: TIMEOUTS.MEDIUM });
+        await this.homePage.click(() => this.homePage.menu.bandejaTareasMenu, this.page);
+    }
+
+    /**
+     * Navega desde Home a Bandeja de Entrada a través de menús secuenciales.
+     * @returns {Promise<void>}
+     */
+    async irABandejaDeEntrada() {
+        await this._abrirSubmenuBandejaTareas();
+        await expect(this.homePage.menu.bandejaEntradaMenu).toBeVisible({ timeout: TIMEOUTS.MEDIUM });
+        await this.homePage.click(() => this.homePage.menu.bandejaEntradaMenu, this.page);
+    }
+
+    /**
+     * Navega hasta Consulta de Instancias WF - Administrador.
+     * @returns {Promise<void>}
+     */
+    async irAConsultaInstanciaAdministrador() {
+        await this._abrirSubmenuBandejaTareas();
+        await expect(this.homePage.menu.consultaInstanciaAdministrador).toBeVisible({ timeout: TIMEOUTS.MEDIUM });
+        await this.homePage.click(() => this.homePage.menu.consultaInstanciaAdministrador, this.page);
+    }
+
+    /**
+     * Navega hasta Consulta de Operaciones Vehiculares.
+     * @returns {Promise<void>}
+     */
+    async irAConsultaOperacionesVehiculares() {
+        await this._abrirMenuInicio();
+        await expect(this.homePage.menu.consultasBasicasMenu).toBeVisible({ timeout: TIMEOUTS.MEDIUM });
+        await this.homePage.click(() => this.homePage.menu.consultasBasicasMenu, this.page);
+        await expect(this.homePage.menu.consultaOperacionesVehiculares).toBeVisible({ timeout: TIMEOUTS.MEDIUM });
+        await this.homePage.click(() => this.homePage.menu.consultaOperacionesVehiculares, this.page);
+        await this.page.waitForLoadState('networkidle');
     }
 }
 

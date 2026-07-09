@@ -32,18 +32,17 @@ class BandejaTareasPage extends BasePage {
         return [this.tituloBandeja];
     }
 
-    async ejecutarTareaSeleccionada() {
-        await this.click(() => this.btnEjecutar, () => this.baseBandeja);
-        await this.waitForFrameStable(this.baseStep2);
-    }
+    // ========== MÉTODOS PRIVADOS: Solo UI ==========
 
     /**
-     * Filtra la bandeja por número de instancia usando escritura secuencial.
+     * Escribe un número en el campo de instancia de forma segura.
+     * @private
      * @param {string|number} instancia
+     * @returns {Promise<void>}
      */
-    async filtrarPorInstancia(instancia) {
+    async _escribirInstanciaEnCampo(instancia) {
         if (!instancia) {
-            throw new Error('filtrarPorInstancia: nroInstancia es requerido');
+            throw new Error('_escribirInstanciaEnCampo: instancia es requerido');
         }
 
         await this.inputInstancia.focus();
@@ -55,27 +54,73 @@ class BandejaTareasPage extends BasePage {
     }
 
     /**
-     * Selecciona la fila que coincide con el número de instancia.
+     * Obtiene la fila que contiene el número de instancia.
+     * @private
      * @param {string|number} instancia
+     * @returns {import('@playwright/test').Locator}
      */
-    async seleccionarFila(instancia) {
+    _getFilaPorInstancia(instancia) {
         if (!instancia) {
-            throw new Error('seleccionarFila: nroInstancia es requerido');
+            throw new Error('_getFilaPorInstancia: instancia es requerido');
         }
 
         const instanciaStr = instancia.toString();
-
-        const fila = this.baseBandeja
+        return this.baseBandeja
             .locator('tr:has(td)')
             .filter({ hasText: instanciaStr });
+    }
 
+    /**
+     * Valida que la fila existe en el DOM.
+     * @private
+     * @param {import('@playwright/test').Locator} fila
+     * @param {string|number} instancia
+     * @returns {Promise<void>}
+     * @throws {Error} si fila no existe
+     */
+    async _validarFilaExiste(fila, instancia) {
         const count = await fila.count();
         if (count === 0) {
-            throw new Error(`No se encontró fila con instancia ${instanciaStr} en la bandeja`);
+            throw new Error(`No se encontró fila con instancia ${instancia} en la bandeja`);
         }
+    }
 
+    /**
+     * Hace clic en una fila esperando que esté visible.
+     * @private
+     * @param {import('@playwright/test').Locator} fila
+     * @returns {Promise<void>}
+     */
+    async _clickEnFila(fila) {
         await expect(fila.first()).toBeVisible({ timeout: TIMEOUTS.LONG });
         await this.click(fila.first(), this.baseBandeja);
+    }
+
+    // ========== MÉTODOS PÚBLICOS: Mantienen interfaz existente ==========
+
+    async ejecutarTareaSeleccionada() {
+        await this.click(() => this.btnEjecutar, () => this.baseBandeja);
+        await this.waitForFrameStable(this.baseStep2);
+    }
+
+    /**
+     * Filtra la bandeja por número de instancia usando escritura secuencial.
+     * Ahora usa método privado para la escritura.
+     * @param {string|number} instancia
+     */
+    async filtrarPorInstancia(instancia) {
+        await this._escribirInstanciaEnCampo(instancia);
+    }
+
+    /**
+     * Selecciona la fila que coincide con el número de instancia.
+     * Ahora usa métodos privados sin validación inline.
+     * @param {string|number} instancia
+     */
+    async seleccionarFila(instancia) {
+        const fila = this._getFilaPorInstancia(instancia);
+        await this._validarFilaExiste(fila, instancia);
+        await this._clickEnFila(fila);
     }
 
     /**
@@ -84,24 +129,6 @@ class BandejaTareasPage extends BasePage {
     async irAInicioProceso() {
         await this.click(this.btnIniciarProceso);
         await expect(this.indicatorStep2).toBeVisible({ timeout: TIMEOUTS.LONG });
-    }
-
-    /*async esperarPaso2Visible() {
-        await this.waitForFrameStable(this.baseStep2);
-        await expect(this.indicatorStep2).toBeVisible({ timeout: TIMEOUTS.LONG });
-    }
-
-    /**
-     * Fallback para combos difíciles en Bantotal
-     */
-    async seleccionarCombo(locator, valor) {
-        if (!valor) return;
-        try {
-            await locator.selectOption({ label: valor }, { timeout: 2000 });
-        } catch (e) {
-            await locator.click();
-            await this.baseBandeja.getByText(valor, { exact: true }).click({ force: true });
-        }
     }
 }
 

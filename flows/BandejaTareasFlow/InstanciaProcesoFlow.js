@@ -1,6 +1,4 @@
-const { IniciarProcesoPage } = require('../../pages/BandejaTareasPages/InstanciaProcesoPage');
-const { TIMEOUTS, FRAMES } = require('../../utils/constants');
-
+const { IniciarProcesoPage } = require('../../pages/BandejaTareasPages/IniciarProcesoPage');
 /**
  * Orquestador para iniciar un nuevo flujo/proceso en Bantotal.
  * Gestiona selección de flujo, llenado de información y transición a STEP2.
@@ -40,18 +38,6 @@ class InstanciaProcesoFlow {
         
         await this.procesoPage.btnIniciar.click();
         await this.procesoPage.page.waitForTimeout(1000);
-        
-    }
-
-    /**
-     * Verifica que la interfaz de inicio de procesos esté disponible.
-     * Valida carga de página y accesibilidad de flujos.
-     * @throws {Error} Si interfaz no carga o flujos no están disponibles
-     * @returns {Promise<void>}
-     */
-    async verificarInterfazDeInicio() {
-        await this.procesoPage.esperarCarga();
-        await this.procesoPage.validarDisponibilidadDeFlujos();
     }
 }
 

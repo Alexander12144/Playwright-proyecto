@@ -64,6 +64,35 @@ class BasePage {
     }
 
     /**
+     * Localiza el iframe activo de un proceso WF entre los frames dinámicos de Bantotal.
+     * Útil cuando el step puede variar (process1_step2, process1_step4, etc.).
+     * @param {Object} [options={}]
+     * @param {string} [options.headerText] - Texto visible que confirma el frame correcto.
+     * @param {number} [options.timeout=TIMEOUTS.MEDIUM] - Timeout para validar el header.
+     * @returns {Promise<import('@playwright/test').Frame|null>} Frame activo o null si no se detecta.
+     */
+    async _findActiveProcessFrame(options = {}) {
+        const { headerText, timeout = TIMEOUTS.MEDIUM } = options;
+        const candidateFrames = this.page.frames().filter((frame) => /process.*_step/i.test(frame.name()));
+
+        for (const candidate of candidateFrames) {
+            try {
+                await this.waitForFrameStable(() => candidate);
+
+                if (headerText) {
+                    await expect(candidate.getByText(headerText).first()).toBeVisible({ timeout });
+                }
+
+                return candidate;
+            } catch {
+                // Continuar con el siguiente candidato.
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Ejecuta una acción con reintentos automáticos y espera a que el locator sea visible.
      * @param {Function|Locator} locator
      * @param {Function|Frame|Page} context
@@ -335,11 +364,11 @@ class BasePage {
     /**
      * Valida que todos los elementos en lista sean visibles.
      * @param {Array<Locator>} [locators=[]] - Elementos a validar
-     * @param {number} [timeout=6000000] - Timeout en ms
+     * @param {number} [timeout=TIMEOUTS.COMPONENT_LOAD] - Timeout en ms
      * @throws {Error} Si algún elemento no es visible
      * @returns {Promise<void>}
      */
-    async validarElementosVisibles(locators = [], timeout = 6000000) {
+    async validarElementosVisibles(locators = [], timeout = TIMEOUTS.COMPONENT_LOAD) {
         for (const locator of locators) {
             await locator.waitFor({ state: 'visible', timeout });
         }

@@ -25,6 +25,75 @@ class SeleccionClientePage extends BasePage {
     get btnSiguiente() { return this.page.getByRole('link', { name: 'Siguiente' }); }
     get btnCerrar() { return this.page.getByRole('link', { name: 'Cerrar' }); }
 
+    // ========== MÉTODOS PRIVADOS: Solo UI ==========
+
+    /**
+     * Completa un campo individual de búsqueda sin lógica.
+     * @private
+     * @param {import('@playwright/test').Locator} campo
+     * @param {string} valor
+     * @returns {Promise<void>}
+     */
+    async _completarCampoBusqueda(campo, valor) {
+        if (valor) {
+            await this.completarCampo(campo, valor);
+        }
+    }
+
+    /**
+     * Obtiene filas del grid filtradas por cuenta.
+     * @private
+     * @param {string} cuenta
+     * @returns {import('@playwright/test').Locator}
+     */
+    _getFilasClientesPor(cuenta) {
+        let fila = this.page.locator('[id^="GridclientesContainerRow_0001"]');
+
+        if (cuenta) {
+            fila = fila.filter({
+                has: this.page.getByRole('cell', {
+                    name: cuenta.toString(),
+                    exact: true
+                })
+            });
+        }
+
+        return fila;
+    }
+
+    /**
+     * Valida que exista exactamente una fila para cuenta.
+     * @private
+     * @param {import('@playwright/test').Locator} fila
+     * @returns {Promise<boolean>} true si hay fila, false si no hay
+     * @throws {Error} si hay múltiples filas
+     */
+    async _validarFilaUnica(fila) {
+        const count = await fila.count();
+
+        if (count === 0) {
+            return false;
+        }
+
+        if (count > 1) {
+            throw new Error(`Se encontraron ${count} clientes, se esperaba máximo 1`);
+        }
+
+        return true;
+    }
+
+    /**
+     * Hace clic en el link de la fila.
+     * @private
+     * @param {import('@playwright/test').Locator} fila
+     * @returns {Promise<void>}
+     */
+    async _clickEnFilaCliente(fila) {
+        await fila.getByRole('link').click();
+    }
+
+    // ========== MÉTODOS PÚBLICOS: Mantienen interfaz existente ==========
+
     async validarUI() {
         const timeout = { timeout: TIMEOUTS.MEDIUM };
 
@@ -49,26 +118,18 @@ class SeleccionClientePage extends BasePage {
     }
 
     async completarDatosBusqueda({ cuenta, pais, tipoDocumento, nroDocumento }) {
-        if (pais) {
-            await this.completarCampo(this.valorPais, pais);
-        }
-        if (tipoDocumento) {
-            await this.completarCampo(this.valorTipoDocumento, tipoDocumento);
-        }
-        if (cuenta) {
-            await this.completarCampo(this.valorCuenta, cuenta);
-        }
-        if (nroDocumento) {
-            await this.completarCampo(this.valorNroDocumento, nroDocumento);
-        }
+        await this._completarCampoBusqueda(this.valorPais, pais);
+        await this._completarCampoBusqueda(this.valorTipoDocumento, tipoDocumento);
+        await this._completarCampoBusqueda(this.valorCuenta, cuenta);
+        await this._completarCampoBusqueda(this.valorNroDocumento, nroDocumento);
 
         await this.btnFiltrar.click();
         await this.page.waitForTimeout(800);
-
     }
 
     /**
      * Realiza la búsqueda completa y selección de un cliente en una sola acción.
+     * Ahora delega a métodos más simples.
      * @param {Object} criterios - Datos de búsqueda
      */
     async buscarYSeleccionarCliente(criterios) {
@@ -77,30 +138,22 @@ class SeleccionClientePage extends BasePage {
         return await this.seleccionarFila(criterios);
     }
 
+    /**
+     * Selecciona la fila que coincide con la cuenta.
+     * Ahora internamente usa métodos simples sin lógica.
+     */
     async seleccionarFila({ cuenta }) {
-        let fila = this.page.locator('[id^="GridclientesContainerRow_0001"]');
+        const fila = this._getFilasClientesPor(cuenta);
+        const existe = await this._validarFilaUnica(fila);
 
-        if (cuenta) {
-            fila = fila.filter({
-                has: this.page.getByRole('cell', {
-                    name: cuenta.toString(),
-                    exact: true
-                })
-            });
-        }
-
-        const count = await fila.count();
-
-        if (count === 0) {
+        if (!existe) {
             await this.btnCerrar.click();
             return false;
         }
 
-        await fila.getByRole('link').click();
-
+        await this._clickEnFilaCliente(fila);
         return true;
     }
-
 }
 
 module.exports = { SeleccionClientePage };

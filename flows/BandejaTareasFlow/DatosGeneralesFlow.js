@@ -1,3 +1,4 @@
+const { expect } = require('@playwright/test');
 const { DatosGeneralesPage } = require('../../pages/BandejaTareasPages/DatosGeneralesPage');
 const { TIMEOUTS, FRAMES } = require('../../utils/constants');
 
@@ -15,21 +16,13 @@ class DatosGeneralesFlow {
      * Completa la sección de Datos Generales y valida transición a STEP3.
      * Precondición: Página STEP2 debe estar visible.
      * @param {Object} [data={}] - Datos generales del cliente
-     * @param {string} data.tipoPersona - Tipo de persona (PF/PJ)
-     * @param {string} data.tipoDoc - Tipo de documento
-     * @param {string} data.numDoc - Número de documento
-     * @param {string} data.tipoSolicitud - Tipo de solicitud
-     * @param {string} data.sucursal - Sucursal
-     * @param {string} data.vendedor - Vendedor asignado
      * @param {Object} [opciones={}] - Configuración del paso
      * @param {boolean} [opciones.validarExito=true] - Avanzar a STEP3 después de completar
-     * @throws {Error} Si alguna validación de campos falla
-     * @throws {Error} Si transición a STEP3 no se completa en timeout
      * @returns {Promise<void>}
      */
     async completarSeccion(data = {}, opciones = { validarExito: true }) {
         const datosGenerales = data.datosGenerales ?? data;
-        
+
         await this.datosPage.esperarCarga();
         await this.datosPage.completarDatosGenerales(datosGenerales);
 
@@ -37,23 +30,49 @@ class DatosGeneralesFlow {
             await this.datosPage.click(() => this.datosPage.linkSiguiente, this.datosPage.baseFrame);
             const step3Frame = this.datosPage.mainFrame.locator(FRAMES.BANDEJA_STEP3);
             await step3Frame.waitFor({ state: 'visible', timeout: TIMEOUTS.PROCESSING_MAX });
-        } else {
-            await this.datosPage.ejecutarValidacion();
-            await this._gestionarErrores(datosGenerales);
+            return;
         }
+
+        await this.datosPage.ejecutarValidacion();
+        await this._gestionarErrores(datosGenerales);
     }
 
     /**
-     * Valida la presencia de mensajes de error esperados.
-     * Se ejecuta cuando validarExito=false. Verifica que faltenén campos requeridos muestren mensajes adecuados.
+     * Valida que el campo de resultado de validación permanezca vacío tras un fallo.
+     * @param {number} [timeout=TIMEOUTS.LONG]
+     * @returns {Promise<void>}
+     */
+    async validarResultadoValidacionVacio(timeout = TIMEOUTS.LONG) {
+        await expect(this.datosPage.inputResultadoValidacion).toHaveValue('', { timeout });
+    }
+
+    /**
+     * Valida que exista al menos un mensaje de campo obligatorio en pantalla.
+     * @param {number} [timeout=TIMEOUTS.LONG]
+     * @returns {Promise<void>}
+     */
+    async validarMensajesObligatoriosVisibles(timeout = TIMEOUTS.LONG) {
+        await expect(this.datosPage.baseFrame.getByText(/Debe\s+/).first()).toBeVisible({ timeout });
+    }
+
+    /**
+     * Valida que el resultado de validación contenga información tras datos válidos.
+     * @param {number} [timeout=TIMEOUTS.LONG]
+     * @returns {Promise<void>}
+     */
+    async validarResultadoValidacionCompleto(timeout = TIMEOUTS.LONG) {
+        await expect(this.datosPage.inputResultadoValidacion).not.toHaveValue('', { timeout });
+    }
+
+    /**
+     * Valida la presencia de mensajes de error esperados según campos faltantes.
      * @private
      * @param {Object} data - Datos incompletos para validación
      * @returns {Promise<void>}
-     * @throws {Error} Si algún error esperado no se muestra
      */
     async _gestionarErrores(data) {
         const msg = this.datosPage.MENSAJES_ERROR;
-        
+
         const camposObligatorios = {
             tipoPersona: msg.tipoPersona,
             tipoDoc: msg.tipoDoc,
@@ -64,8 +83,8 @@ class DatosGeneralesFlow {
         };
 
         const erroresAValidar = Object.keys(camposObligatorios)
-            .filter(key => !data[key])
-            .map(key => camposObligatorios[key]);
+            .filter((key) => !data[key])
+            .map((key) => camposObligatorios[key]);
 
         await this.datosPage.validarErrores(erroresAValidar);
     }

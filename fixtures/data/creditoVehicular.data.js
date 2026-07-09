@@ -1,3 +1,5 @@
+const { TEST_DATA } = require('../../utils/constants');
+
 const BASE_CREDITO_VEHICULAR = Object.freeze({
     tipoPersona: 'Natural',
     tipoDoc: 'D.N.I.',
@@ -28,18 +30,12 @@ const BASE_DATOS_PERSONA = Object.freeze({
     tipoAlta: 'Normal'
 });
 
-const DATOS_OPERACION_VEICULAR = Object.freeze({
-    cuenta: '172022',
-    operacion: '2235017',
-    estado: 'Aprobada'
-});
-
 function buildInstanciaExistente(overrides = {}) {
     const generalOverrides = overrides.datosGenerales ?? {};
     const personaOverrides = overrides.datosPersona ?? {};
     return {
         instancia: {
-            nroInstancia: overrides.nroInstancia ?? '918094'
+            nroInstancia: overrides.nroInstancia ?? TEST_DATA.INSTANCIA_EXISTENTE
         },
         datosGenerales: {
             ...BASE_CREDITO_VEHICULAR,
@@ -49,17 +45,6 @@ function buildInstanciaExistente(overrides = {}) {
             ...personaOverrides
         }
     };
-}
-
-function buildInstanciaExistenteConPersona(overrides = {}) {
-    const personaOverrides = overrides.datosPersona ?? {};
-    return buildInstanciaExistente({
-        ...overrides,
-        datosPersona: {
-            ...BASE_DATOS_PERSONA,
-            ...personaOverrides
-        }
-    });
 }
 
 function buildDatosIncompletos(overrides = {}) {
@@ -78,6 +63,5 @@ module.exports = {
     BASE_CREDITO_VEHICULAR,
     BASE_DATOS_PERSONA,
     buildInstanciaExistente,
-    buildInstanciaExistenteConPersona,
     buildDatosIncompletos
 };
